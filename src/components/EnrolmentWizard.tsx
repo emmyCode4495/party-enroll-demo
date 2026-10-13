@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Script from "next/script";
 import { supabase, type Member } from "@/lib/supabase";
+import MembershipCard from "./MembershipCard";
 
 interface FormData {
   fullName: string;
@@ -15,7 +16,26 @@ interface FormData {
   state: string;
 }
 
+type Errors = Partial<Record<keyof FormData, string>>;
+type Tone = "info" | "ok" | "warn" | "error";
+type View = "register" | "members" | "admin";
+
 const MATCH_THRESHOLD = 0.55;
+const PASS_STRENGTH = (1 - MATCH_THRESHOLD) * 100; // match strength needed to pass, in %
+
+const STEPS = ["Details", "ID photo", "Face check", "Result"] as const;
+
+const NG_STATES = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+  "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT Abuja", "Gombe",
+  "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos",
+  "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto",
+  "Taraba", "Yobe", "Zamfara",
+];
+
+const EMPTY_FORM: FormData = {
+  fullName: "", dob: "", idNumber: "", phone: "", email: "", address: "", gender: "", state: "",
+};
 
 declare global {
   interface Window {
@@ -23,18 +43,134 @@ declare global {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Small helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+function todayISO() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+function validate(f: FormData): Errors {
+  const e: Errors = {};
+  if (!f.fullName.trim()) e.fullName = "Enter your full name as it appears on your ID.";
+  if (!f.dob) e.dob = "Choose your date of birth.";
+  else if (f.dob > todayISO()) e.dob = "Date of birth can't be in the future.";
+  if (!f.idNumber.trim()) e.idNumber = "Enter your ID or passport number.";
+  if (!f.phone.trim()) e.phone = "Enter a phone number we can reach you on.";
+  else if (f.phone.replace(/\D/g, "").length < 7) e.phone = "That phone number looks too short.";
+  if (!f.email.trim()) e.email = "Enter your email address.";
+  else if (!/^\S+@\S+\.\S+$/.test(f.email.trim())) e.email = "Enter a valid email, like name@example.com.";
+  if (!f.address.trim()) e.address = "Enter your home address.";
+  if (!f.gender) e.gender = "Choose an option.";
+  return e;
+}
+
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+}
+
+function toneClasses(t: Tone) {
+  switch (t) {
+    case "ok":
+      return "bg-brand-tint text-brand-deep";
+    case "warn":
+      return "bg-brass-tint text-[#6b4a00]";
+    case "error":
+      return "bg-stamp-tint text-stamp";
+    default:
+      return "bg-white text-ink-soft border border-line";
+  }
+}
+
+function Field({
+  label, htmlFor, required, hint, error, className = "", children,
+}: {
+  label: string;
+  htmlFor: string;
+  required?: boolean;
+  hint?: string;
+  error?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={className}>
+      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-semibold text-ink">
+        {label}
+        {!required && <span className="ml-1.5 font-normal text-ink-soft">(optional)</span>}
+      </label>
+      {children}
+      {error ? (
+        <p id={`${htmlFor}-error`} className="mt-1.5 text-sm font-medium text-stamp">
+          {error}
+        </p>
+      ) : hint ? (
+        <p id={`${htmlFor}-hint`} className="mt-1.5 text-sm text-ink-soft">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function Spinner({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BrandMark() {
+  return (
+    <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-brand-deep" aria-hidden="true">
+      <svg viewBox="0 0 32 32" className="h-7 w-7">
+        <circle cx="12" cy="16" r="9" fill="none" stroke="#d9a431" strokeWidth="2.5" />
+        <circle cx="20" cy="16" r="9" fill="none" stroke="#f2f7f4" strokeWidth="2.5" />
+      </svg>
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Main component                                                      */
+/* ------------------------------------------------------------------ */
+
 export default function EnrolmentWizard() {
-  const [view, setView] = useState<"register" | "members" | "admin">("register");
+  const [view, setView] = useState<View>("register");
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>({
-    fullName: "", dob: "", idNumber: "", phone: "", email: "", address: "", gender: "", state: "",
-  });
+  const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
+  const [errors, setErrors] = useState<Errors>({});
   const [idImage, setIdImage] = useState<string | null>(null);
   const [idDescriptor, setIdDescriptor] = useState<Float32Array | null>(null);
   const [matchDistance, setMatchDistance] = useState<number | null>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [faceStatus, setFaceStatus] = useState("Loading models...");
-  const [idStatus, setIdStatus] = useState("");
+  const [modelsFailed, setModelsFailed] = useState(false);
+  const [face, setFace] = useState<{ text: string; tone: Tone }>({ text: "Loading face recognition…", tone: "info" });
+  const [id, setId] = useState<{ text: string; tone: Tone }>({ text: "", tone: "info" });
+  const [idBusy, setIdBusy] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState<boolean | null>(null);
@@ -44,52 +180,31 @@ export default function EnrolmentWizard() {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+  const [query, setQuery] = useState("");
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [toast, setToast] = useState<{ text: string; tone: Tone } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const prevKey = useRef(`register-1`);
 
-  // Load members + realtime subscription
-  useEffect(() => {
-    fetchMembers();
-
-    const channel = supabase
-      .channel("members-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "members" },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setMembers((prev) => {
-              const exists = prev.some((m) => m.membership_id === (payload.new as Member).membership_id);
-              if (exists) return prev;
-              return [payload.new as Member, ...prev];
-            });
-          }
-          if (payload.eventType === "UPDATE") {
-            setMembers((prev) =>
-              prev.map((m) =>
-                m.membership_id === (payload.new as Member).membership_id
-                  ? (payload.new as Member)
-                  : m
-              )
-            );
-          }
-          if (payload.eventType === "DELETE") {
-            setMembers((prev) =>
-              prev.filter((m) => m.membership_id !== (payload.old as Member).membership_id)
-            );
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+  const showToast = useCallback((text: string, tone: Tone = "info") => {
+    setToast({ text, tone });
   }, []);
 
-  async function fetchMembers() {
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  /* ---------------- Members + realtime ---------------- */
+
+  const fetchMembers = useCallback(async () => {
     setLoadingMembers(true);
     setDbError(null);
     try {
@@ -97,22 +212,52 @@ export default function EnrolmentWizard() {
         .from("members")
         .select("*")
         .order("registered_at", { ascending: false });
-
       if (error) throw error;
       setMembers(data || []);
     } catch (err: any) {
       console.error(err);
-      setDbError(err.message || "Failed to load members. Check Supabase connection.");
+      setDbError(err.message || "We couldn't load the member list. Check your Supabase connection.");
     } finally {
       setLoadingMembers(false);
     }
-  }
+  }, []);
 
-  // Face models
+  useEffect(() => {
+    fetchMembers();
+
+    const channel = supabase
+      .channel("members-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, (payload) => {
+        if (payload.eventType === "INSERT") {
+          setMembers((prev) => {
+            const exists = prev.some((m) => m.membership_id === (payload.new as Member).membership_id);
+            if (exists) return prev;
+            return [payload.new as Member, ...prev];
+          });
+        }
+        if (payload.eventType === "UPDATE") {
+          setMembers((prev) =>
+            prev.map((m) =>
+              m.membership_id === (payload.new as Member).membership_id ? (payload.new as Member) : m
+            )
+          );
+        }
+        if (payload.eventType === "DELETE") {
+          setMembers((prev) => prev.filter((m) => m.membership_id !== (payload.old as Member).membership_id));
+        }
+      })
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchMembers]);
+
+  /* ---------------- Face models ---------------- */
+
   useEffect(() => {
     if (!scriptReady || modelsLoaded) return;
     const load = async () => {
-      setFaceStatus("Loading face recognition models...");
       try {
         const faceapi = window.faceapi;
         const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/model";
@@ -122,14 +267,24 @@ export default function EnrolmentWizard() {
           faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         ]);
         setModelsLoaded(true);
-        setFaceStatus("Models ready. Start the camera when ready.");
+        setFace({ text: "Ready. Start the camera when you are.", tone: "info" });
       } catch (e) {
         console.error(e);
-        setFaceStatus("Failed to load models.");
+        setModelsFailed(true);
+        setFace({ text: "Face recognition failed to load. Check your connection and refresh the page.", tone: "error" });
       }
     };
     load();
   }, [scriptReady, modelsLoaded]);
+
+  /* ---------------- Camera ---------------- */
+
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setStream(null);
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
 
   const startCamera = async () => {
     try {
@@ -137,32 +292,63 @@ export default function EnrolmentWizard() {
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
       });
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       if (videoRef.current) videoRef.current.srcObject = mediaStream;
-      setFaceStatus("Camera active. Position your face and capture.");
+      setFace({ text: "Camera on. Centre your face in the oval, then take the photo.", tone: "info" });
     } catch {
-      setFaceStatus("Camera access denied.");
+      setFace({
+        text: "Camera blocked. Allow camera access in your browser's address bar, then try again.",
+        tone: "error",
+      });
     }
   };
 
-  const stopCamera = () => {
-    stream?.getTracks().forEach((t) => t.stop());
-    setStream(null);
-    if (videoRef.current) videoRef.current.srcObject = null;
-  };
+  // Re-attach the stream if the video element remounts, and release the camera when leaving the face step.
+  useEffect(() => {
+    if (view === "register" && step === 3 && stream && videoRef.current && videoRef.current.srcObject !== stream) {
+      videoRef.current.srcObject = stream;
+    }
+    if ((view !== "register" || step !== 3) && streamRef.current) {
+      stopCamera();
+    }
+  }, [view, step, stream, stopCamera]);
 
-  const handleIdUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || file.size > 10 * 1024 * 1024) return;
+  useEffect(() => () => streamRef.current?.getTracks().forEach((t) => t.stop()), []);
+
+  // Move focus to the new step for keyboard and screen-reader users.
+  useEffect(() => {
+    const key = `${view}-${step}`;
+    if (prevKey.current === key) return;
+    prevKey.current = key;
+    panelRef.current?.focus({ preventScroll: true });
+    panelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [step, view]);
+
+  /* ---------------- ID upload ---------------- */
+
+  const processIdFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setId({ text: "That file isn't an image. Upload a JPG or PNG photo of your ID.", tone: "error" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setId({ text: "That photo is over 10 MB. Choose a smaller one.", tone: "error" });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataUrl = ev.target?.result as string;
       setIdImage(dataUrl);
-      setIdStatus("Detecting face on ID...");
+      setIdDescriptor(null);
+      setMatchDistance(null);
       if (!modelsLoaded) {
-        setIdStatus("Models not ready yet. Wait a moment.");
+        setId({ text: "Face recognition is still loading. Wait a moment, then upload again.", tone: "warn" });
         return;
       }
+      setIdBusy(true);
+      setId({ text: "Looking for your face on the ID…", tone: "info" });
       try {
         const faceapi = window.faceapi;
         const img = await faceapi.bufferToImage(await (await fetch(dataUrl)).blob());
@@ -171,22 +357,34 @@ export default function EnrolmentWizard() {
           .withFaceLandmarks()
           .withFaceDescriptor();
         if (!detection) {
-          setIdStatus("No face detected on the ID.");
-          setIdDescriptor(null);
+          setId({
+            text: "We couldn't find a face on this ID. Retake the photo in good light with the whole card in frame.",
+            tone: "error",
+          });
           return;
         }
         setIdDescriptor(detection.descriptor);
-        setIdStatus("✓ Face detected on ID. You may proceed.");
+        setId({ text: "Face found on your ID. You can continue.", tone: "ok" });
       } catch {
-        setIdStatus("Error processing ID.");
+        setId({ text: "Something went wrong reading that photo. Try a different one.", tone: "error" });
+      } finally {
+        setIdBusy(false);
       }
     };
     reader.readAsDataURL(file);
   };
 
+  const handleIdUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processIdFile(e.target.files?.[0]);
+    e.target.value = "";
+  };
+
+  /* ---------------- Capture + match ---------------- */
+
   const captureAndMatch = async () => {
     if (!videoRef.current || !idDescriptor || !modelsLoaded) return;
-    setFaceStatus("Capturing...");
+    setCapturing(true);
+    setFace({ text: "Checking your face…", tone: "info" });
     try {
       const faceapi = window.faceapi;
       const detection = await faceapi
@@ -194,7 +392,7 @@ export default function EnrolmentWizard() {
         .withFaceLandmarks()
         .withFaceDescriptor();
       if (!detection) {
-        setFaceStatus("No face detected.");
+        setFace({ text: "No face found. Face the camera in good light and try again.", tone: "warn" });
         return;
       }
       const canvas = canvasRef.current;
@@ -210,29 +408,34 @@ export default function EnrolmentWizard() {
       }
       const dist = faceapi.euclideanDistance(idDescriptor, detection.descriptor);
       setMatchDistance(dist);
-      setFaceStatus(`Distance: ${dist.toFixed(3)} (threshold ${MATCH_THRESHOLD})`);
+      setFace({
+        text: dist <= MATCH_THRESHOLD ? "Captured. Your face matches your ID." : "Captured, but it doesn't match your ID closely enough.",
+        tone: dist <= MATCH_THRESHOLD ? "ok" : "warn",
+      });
     } catch {
-      setFaceStatus("Capture error.");
+      setFace({ text: "The check failed. Try again.", tone: "error" });
+    } finally {
+      setCapturing(false);
     }
   };
 
+  /* ---------------- Navigation ---------------- */
+
   const goToStep = (next: number) => {
     if (next === 2) {
-      if (!formData.fullName || !formData.dob || !formData.idNumber || !formData.phone || !formData.email || !formData.address || !formData.gender) {
-        alert("Please fill all required fields.");
+      const e = validate(formData);
+      setErrors(e);
+      const first = Object.keys(e)[0];
+      if (first) {
+        document.getElementById(first)?.focus();
         return;
       }
     }
-    if (next === 3 && !idDescriptor) {
-      alert("Upload a valid ID with detectable face.");
-      return;
-    }
+    if (next === 3 && !idDescriptor) return;
     if (next === 4) {
-      if (matchDistance === null) {
-        alert("Capture your face first.");
-        return;
-      }
+      if (matchDistance === null) return;
       setVerifying(true);
+      setVerified(null);
       setTimeout(() => {
         const success = matchDistance <= MATCH_THRESHOLD;
         setVerified(success);
@@ -269,19 +472,17 @@ export default function EnrolmentWizard() {
     try {
       const { error } = await supabase.from("members").insert([payload]);
       if (error) throw error;
-
-      // Realtime will push the new member, but we can also optimistically add
       setMembers((prev) => {
         if (prev.some((m) => m.membership_id === membershipId)) return prev;
         return [payload as Member, ...prev];
       });
-
       setStep(5);
       stopCamera();
     } catch (err: any) {
       console.error(err);
-      setDbError(err.message || "Failed to save membership. Check Supabase.");
-      alert("Could not save to database: " + (err.message || "Unknown error"));
+      const msg = err.message || "Unknown error";
+      setDbError(`We couldn't save your membership: ${msg}. Your details are still here, so try again.`);
+      showToast("Membership not saved. Try again.", "error");
     } finally {
       setSaving(false);
     }
@@ -289,26 +490,94 @@ export default function EnrolmentWizard() {
 
   const resetForm = () => {
     setStep(1);
-    setFormData({ fullName: "", dob: "", idNumber: "", phone: "", email: "", address: "", gender: "", state: "" });
+    setFormData(EMPTY_FORM);
+    setErrors({});
     setIdImage(null);
     setIdDescriptor(null);
     setMatchDistance(null);
     setVerified(null);
     setMembershipId("");
-    setIdStatus("");
+    setId({ text: "", tone: "info" });
+    setDbError(null);
     stopCamera();
   };
 
   const clearAllMembers = async () => {
-    if (!confirm("Delete ALL members from the database? This cannot be undone.")) return;
     try {
       const { error } = await supabase.from("members").delete().neq("membership_id", "");
       if (error) throw error;
       setMembers([]);
+      showToast("All members deleted.", "ok");
     } catch (err: any) {
-      alert("Failed to clear: " + err.message);
+      showToast(`Couldn't delete members: ${err.message}`, "error");
+    } finally {
+      setConfirmClear(false);
     }
   };
+
+  const exportCsv = () => {
+    const cols: (keyof Member)[] = [
+      "membership_id", "full_name", "dob", "id_number", "phone", "email", "address",
+      "gender", "state", "match_score", "registered_at",
+    ];
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const csv = [cols.join(","), ...members.map((m) => cols.map((c) => esc(m[c])).join(","))].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `unity-party-members-${todayISO()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /* ---------------- Derived ---------------- */
+
+  const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData((f) => ({ ...f, [k]: e.target.value }));
+    if (errors[k]) setErrors((er) => ({ ...er, [k]: undefined }));
+  };
+
+  const fieldProps = (k: keyof FormData) => ({
+    id: k,
+    value: formData[k],
+    onChange: set(k),
+    "aria-invalid": errors[k] ? (true as const) : undefined,
+    "aria-describedby": errors[k] ? `${k}-error` : `${k}-hint`,
+    className: "field-input",
+  });
+
+  const strength = matchDistance === null ? null : Math.max(0, Math.min(100, (1 - matchDistance) * 100));
+  const passes = matchDistance !== null && matchDistance <= MATCH_THRESHOLD;
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter((m) =>
+      [m.full_name, m.membership_id, m.state ?? "", m.id_number].some((v) => v.toLowerCase().includes(q))
+    );
+  }, [members, query]);
+
+  const stats = useMemo(() => {
+    const today = new Date().toDateString();
+    const scores = members.map((m) => parseFloat(m.match_score)).filter((n) => !Number.isNaN(n));
+    const byState = new Map<string, number>();
+    members.forEach((m) => {
+      const s = m.state?.trim() || "Not given";
+      byState.set(s, (byState.get(s) ?? 0) + 1);
+    });
+    return {
+      total: members.length,
+      verified: members.filter((m) => m.verified).length,
+      today: members.filter((m) => new Date(m.registered_at).toDateString() === today).length,
+      avg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null,
+      states: [...byState.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6),
+    };
+  }, [members]);
+
+  const issued = step === 5;
+  const showCard = view === "register";
+
+  /* ================================================================ */
 
   return (
     <>
@@ -316,268 +585,594 @@ export default function EnrolmentWizard() {
         src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/dist/face-api.js"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
+        onError={() => {
+          setModelsFailed(true);
+          setFace({ text: "Face recognition failed to load. Check your connection and refresh the page.", tone: "error" });
+        }}
       />
-      <div className="min-h-screen relative">
-        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl" />
-          <div className="absolute top-1/3 -left-40 w-80 h-80 bg-violet-500/15 rounded-full blur-3xl" />
-        </div>
 
-        <header className="border-b border-white/5 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-50">
-          <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center font-bold text-lg shadow-lg shadow-blue-500/30">U</div>
-              <div>
-                <h1 className="font-bold text-lg">Unity Party</h1>
-                <p className="text-xs text-slate-400">Realtime Member Enrolment · Supabase</p>
-              </div>
-            </div>
-            <nav className="flex gap-2">
-              {(["register", "members", "admin"] as const).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => setView(k)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${view === k ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-white/5"}`}
-                >
-                  {k === "register" ? "Enrol" : k}
-                </button>
-              ))}
-            </nav>
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2">
+        Skip to content
+      </a>
+
+      {/* ------------------------------ Header ------------------------------ */}
+      <header className="sticky top-0 z-40 border-b border-line bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-3">
+            <BrandMark />
+            <p className="font-display text-lg font-bold leading-none tracking-tight">
+              Unity Party
+              <span className="mt-1 block text-xs font-medium text-ink-soft">Membership</span>
+            </p>
           </div>
-        </header>
+          <nav aria-label="Main" className="flex gap-1 rounded-xl bg-paper p-1">
+            {(
+              [
+                ["register", "Join"],
+                ["members", "Members"],
+                ["admin", "Admin"],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => setView(k)}
+                aria-current={view === k ? "page" : undefined}
+                className={`min-h-10 rounded-lg px-3.5 text-sm font-semibold transition-colors sm:px-4 ${
+                  view === k ? "bg-white text-ink shadow-sm ring-1 ring-line" : "text-ink-soft hover:text-ink"
+                }`}
+              >
+                {label}
+                {k === "members" && members.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-brand-tint px-1.5 py-0.5 text-xs text-brand-deep">{members.length}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
 
-        <main className="max-w-4xl mx-auto px-4 py-8">
-          {dbError && (
-            <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">
-              {dbError}
-              <button onClick={fetchMembers} className="ml-3 underline">Retry</button>
-            </div>
-          )}
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
+        {dbError && view !== "register" && (
+          <div role="alert" className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-stamp/30 bg-stamp-tint p-4 text-sm text-stamp">
+            <span className="flex-1 font-medium">{dbError}</span>
+            <button onClick={fetchMembers} className="btn btn-secondary !min-h-9 !px-3 text-sm">Try again</button>
+          </div>
+        )}
 
-          {view === "register" && (
-            <div>
-              {step < 5 && (
-                <div className="flex items-center justify-between mb-10">
-                  {[1, 2, 3, 4].map((n) => (
-                    <div key={n} className="flex flex-col items-center gap-2 flex-1">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${n < step ? "bg-emerald-500 text-white" : n === step ? "bg-blue-600 text-white shadow-lg shadow-blue-600/40" : "bg-slate-700 text-slate-400"}`}>
-                        {n < step ? "✓" : n}
+        {/* =========================== JOIN =========================== */}
+        {view === "register" && (
+          <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-14">
+            <div className={`min-w-0 ${issued ? "order-2 lg:order-1" : ""}`}>
+              {!issued && (
+                <div className="mb-8">
+                  <h1 className="max-w-[18ch] text-4xl font-extrabold leading-[1.05] sm:text-5xl">
+                    Become a member of Unity Party
+                  </h1>
+                  <p className="mt-4 max-w-[52ch] text-lg leading-relaxed text-ink-soft">
+                    It takes about three minutes. Bring your ID and allow camera access. Your photos are checked on this device and are never uploaded.
+                  </p>
+                </div>
+              )}
+
+              {!issued && (
+                <ol aria-label="Progress" className="mb-6 grid grid-cols-4 gap-2">
+                  {STEPS.map((label, i) => {
+                    const n = i + 1;
+                    const done = n < step;
+                    const current = n === step;
+                    return (
+                      <li key={label} aria-current={current ? "step" : undefined}>
+                        <div className={`h-1.5 rounded-full ${done ? "bg-brand" : current ? "bg-brass" : "bg-line"}`} />
+                        <p className={`mt-2 text-sm ${current ? "font-bold text-ink" : done ? "font-medium text-brand-deep" : "text-ink-soft"}`}>
+                          <span className="sr-only">Step </span>
+                          {n}
+                          <span className="hidden sm:inline">. {label}</span>
+                          <span className="sr-only sm:hidden">. {label}</span>
+                          {done && <span className="sr-only"> (complete)</span>}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+
+              <div ref={panelRef} tabIndex={-1} className="rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(15,42,36,0.04)] outline-none sm:p-8">
+                {/* ------------------ Step 1: details ------------------ */}
+                {step === 1 && (
+                  <form
+                    noValidate
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      goToStep(2);
+                    }}
+                  >
+                    <h2 className="text-2xl font-bold">Your details</h2>
+                    <p className="mt-1 mb-6 text-ink-soft">Type them exactly as they appear on your ID.</p>
+
+                    <div className="grid grid-cols-1 gap-x-5 gap-y-5 md:grid-cols-2">
+                      <Field label="Full name" htmlFor="fullName" required error={errors.fullName} className="md:col-span-2">
+                        <input {...fieldProps("fullName")} autoComplete="name" placeholder="e.g. Amina Yusuf Bello" />
+                      </Field>
+                      <Field label="Date of birth" htmlFor="dob" required error={errors.dob}>
+                        <input {...fieldProps("dob")} type="date" max={todayISO()} autoComplete="bday" />
+                      </Field>
+                      <Field label="Gender" htmlFor="gender" required error={errors.gender}>
+                        <select {...fieldProps("gender")}>
+                          <option value="">Choose one</option>
+                          <option>Female</option>
+                          <option>Male</option>
+                          <option>Prefer not to say</option>
+                        </select>
+                      </Field>
+                      <Field label="National ID or passport number" htmlFor="idNumber" required error={errors.idNumber} hint="Shown only as the last four digits on your card.">
+                        <input {...fieldProps("idNumber")} autoComplete="off" />
+                      </Field>
+                      <Field label="State of origin" htmlFor="state" required={false}>
+                        <input {...fieldProps("state")} list="states" autoComplete="off" placeholder="Start typing…" />
+                        <datalist id="states">
+                          {NG_STATES.map((s) => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
+                      </Field>
+                      <Field label="Phone number" htmlFor="phone" required error={errors.phone}>
+                        <input {...fieldProps("phone")} type="tel" inputMode="tel" autoComplete="tel" placeholder="0803 000 0000" />
+                      </Field>
+                      <Field label="Email" htmlFor="email" required error={errors.email}>
+                        <input {...fieldProps("email")} type="email" inputMode="email" autoComplete="email" placeholder="name@example.com" />
+                      </Field>
+                      <Field label="Home address" htmlFor="address" required error={errors.address} className="md:col-span-2">
+                        <textarea {...fieldProps("address")} rows={2} autoComplete="street-address" className="field-input resize-none" />
+                      </Field>
+                    </div>
+
+                    <div className="mt-8 flex justify-end">
+                      <button type="submit" className="btn btn-primary w-full sm:w-auto">Continue to ID photo</button>
+                    </div>
+                  </form>
+                )}
+
+                {/* ------------------ Step 2: ID ------------------ */}
+                {step === 2 && (
+                  <div>
+                    <h2 className="text-2xl font-bold">Upload a photo of your ID</h2>
+                    <p className="mt-1 mb-6 max-w-[56ch] text-ink-soft">
+                      Use your National ID, passport or driver&rsquo;s licence. Lay it flat in good light with all four corners visible.
+                    </p>
+
+                    <input ref={fileInputRef} type="file" accept="image/*" className="sr-only" id="id-file" onChange={handleIdUpload} />
+                    <label
+                      htmlFor="id-file"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOver(true);
+                      }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                        processIdFile(e.dataTransfer.files?.[0]);
+                      }}
+                      className={`flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-colors focus-within:outline focus-within:outline-[3px] focus-within:outline-brass ${
+                        dragOver ? "border-brand bg-brand-tint" : idImage ? "border-line-strong bg-paper" : "border-line-strong bg-paper hover:border-brand"
+                      }`}
+                    >
+                      {idImage ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={idImage} alt="Your uploaded ID" className="max-h-60 rounded-lg shadow-md" />
+                          <span className="mt-4 text-sm font-semibold text-brand">Choose a different photo</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg viewBox="0 0 48 48" className="h-12 w-12 text-brand" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                            <rect x="5" y="10" width="38" height="28" rx="4" />
+                            <circle cx="17" cy="23" r="4" />
+                            <path d="M10 33c1-4 4-6 7-6s6 2 7 6M29 21h10M29 27h7" strokeLinecap="round" />
+                          </svg>
+                          <span className="mt-3 text-base font-semibold">Choose a photo or drag it here</span>
+                          <span className="mt-1 text-sm text-ink-soft">JPG or PNG, up to 10 MB</span>
+                        </>
+                      )}
+                    </label>
+
+                    <div aria-live="polite" className="mt-4 min-h-6">
+                      {idBusy && (
+                        <p className="flex items-center gap-2 text-sm text-ink-soft">
+                          <Spinner className="h-4 w-4" /> {id.text}
+                        </p>
+                      )}
+                      {!idBusy && id.text && (
+                        <p className={`inline-block rounded-lg px-3 py-2 text-sm font-medium ${toneClasses(id.tone)}`}>{id.text}</p>
+                      )}
+                    </div>
+
+                    <div className="mt-8 flex justify-between gap-3">
+                      <button onClick={() => setStep(1)} className="btn btn-secondary">Back</button>
+                      <button onClick={() => goToStep(3)} disabled={!idDescriptor || idBusy} className="btn btn-primary">
+                        Continue to face check
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ------------------ Step 3: face ------------------ */}
+                {step === 3 && (
+                  <div>
+                    <h2 className="text-2xl font-bold">Check your face</h2>
+                    <p className="mt-1 mb-6 max-w-[56ch] text-ink-soft">
+                      We compare a live photo of you with the photo on your ID. Remove sunglasses or a cap and face the light.
+                    </p>
+
+                    <div className="grid items-start gap-5 md:grid-cols-[1fr_9rem]">
+                      <div className="relative mx-auto aspect-[4/5] w-full max-w-md overflow-hidden rounded-2xl bg-brand-deep">
+                        <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                        <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+
+                        {/* Oval guide */}
+                        <svg viewBox="0 0 100 125" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+                          <defs>
+                            <mask id="oval-mask">
+                              <rect width="100" height="125" fill="white" />
+                              <ellipse cx="50" cy="58" rx="28" ry="38" fill="black" />
+                            </mask>
+                          </defs>
+                          <rect width="100" height="125" fill="rgba(8,56,43,0.55)" mask="url(#oval-mask)" />
+                          <ellipse
+                            cx="50" cy="58" rx="28" ry="38" fill="none"
+                            stroke={strength !== null ? (passes ? "#7fe0b0" : "#ff9c92") : "#d9a431"}
+                            strokeWidth="0.8" strokeDasharray={stream ? "0" : "2 2"}
+                          />
+                        </svg>
+                        {stream && !capturing && matchDistance === null && <div className="scan-line" />}
+
+                        {!stream && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-end gap-3 p-5 text-center text-white">
+                            <p className="text-sm text-white/80">The camera is off</p>
+                          </div>
+                        )}
+                        {capturing && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-brand-deep/40 text-white">
+                            <Spinner className="h-8 w-8" />
+                          </div>
+                        )}
                       </div>
-                      <span className="text-xs text-slate-400 hidden sm:block">{["Personal", "ID Upload", "Face Scan", "Verify"][n - 1]}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
 
-              {step === 1 && (
-                <div className="glass rounded-2xl p-6 md:p-8">
-                  <h2 className="text-2xl font-bold mb-1">Personal Information</h2>
-                  <p className="text-slate-400 text-sm mb-6">Enter details as on your official ID.</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">Full Legal Name *</label>
-                      <input className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/10 focus:border-blue-500 outline-none" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} placeholder="Full name" />
+                      {/* ID reference */}
+                      <div className="hidden md:block">
+                        <p className="mb-2 text-sm font-semibold">Your ID photo</p>
+                        {idImage && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={idImage} alt="Your ID, used for comparison" className="w-full rounded-lg border border-line" />
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">Date of Birth *</label>
-                      <input type="date" className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/10 focus:border-blue-500 outline-none" value={formData.dob} onChange={(e) => setFormData({ ...formData, dob: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">National ID / Passport *</label>
-                      <input className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/10 focus:border-blue-500 outline-none" value={formData.idNumber} onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">Phone *</label>
-                      <input className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/10 focus:border-blue-500 outline-none" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">Email *</label>
-                      <input type="email" className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/10 focus:border-blue-500 outline-none" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">Address *</label>
-                      <textarea className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/10 focus:border-blue-500 outline-none resize-none" rows={2} value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">Gender *</label>
-                      <select className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/10 focus:border-blue-500 outline-none" value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })}>
-                        <option value="">Select</option>
-                        <option>Female</option>
-                        <option>Male</option>
-                        <option>Prefer not to say</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-300 mb-1.5">State of Origin</label>
-                      <input className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/10 focus:border-blue-500 outline-none" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="mt-8 flex justify-end">
-                    <button onClick={() => goToStep(2)} className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold shadow-lg shadow-blue-600/30">Continue</button>
-                  </div>
-                </div>
-              )}
 
-              {step === 2 && (
-                <div className="glass rounded-2xl p-6 md:p-8">
-                  <h2 className="text-2xl font-bold mb-1">Upload Official ID</h2>
-                  <p className="text-slate-400 text-sm mb-6">Clear photo of National ID / Passport / License.</p>
-                  <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-white/15 rounded-2xl p-8 text-center hover:border-blue-500/50 cursor-pointer">
-                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleIdUpload} />
-                    {idImage ? <img src={idImage} alt="ID" className="max-h-64 mx-auto rounded-xl mb-4" /> : <p className="font-medium">Click to upload</p>}
-                  </div>
-                  {idStatus && <p className={`mt-4 text-sm ${idStatus.startsWith("✓") ? "text-emerald-400" : "text-rose-400"}`}>{idStatus}</p>}
-                  <div className="mt-8 flex justify-between">
-                    <button onClick={() => setStep(1)} className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700">Back</button>
-                    <button onClick={() => goToStep(3)} disabled={!idDescriptor} className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold disabled:opacity-50">Continue</button>
-                  </div>
-                </div>
-              )}
+                    <p
+                      aria-live="polite"
+                      className={`mx-auto mt-4 max-w-md rounded-lg px-3 py-2 text-center text-sm font-medium ${toneClasses(face.tone)}`}
+                    >
+                      {face.text}
+                    </p>
 
-              {step === 3 && (
-                <div className="glass rounded-2xl p-6 md:p-8">
-                  <h2 className="text-2xl font-bold mb-1">Live Face Verification</h2>
-                  <p className="text-slate-400 text-sm mb-6">Match your live face to the ID photo.</p>
-                  <div className="relative mx-auto max-w-md aspect-[3/4] bg-slate-900 rounded-2xl overflow-hidden border border-white/10">
-                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                    <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+                    {strength !== null && (
+                      <div className="mx-auto mt-5 max-w-md pop-in">
+                        <div className="mb-1.5 flex items-baseline justify-between text-sm">
+                          <span className="font-semibold">Match strength</span>
+                          <span className={`font-bold ${passes ? "text-brand" : "text-stamp"}`}>{strength.toFixed(0)}%</span>
+                        </div>
+                        <div className="relative h-3 rounded-full bg-line" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(strength)} aria-label="Match strength">
+                          <div className={`h-full rounded-full ${passes ? "bg-brand" : "bg-stamp"}`} style={{ width: `${strength}%` }} />
+                          <div className="absolute -top-1 h-5 w-0.5 bg-ink" style={{ left: `${PASS_STRENGTH}%` }} />
+                        </div>
+                        <p className="mt-1.5 text-xs text-ink-soft">The line marks the minimum needed to pass ({PASS_STRENGTH.toFixed(0)}%).</p>
+                      </div>
+                    )}
+
+                    <div className="mt-6 flex flex-wrap justify-center gap-3">
+                      {!stream ? (
+                        <button onClick={startCamera} disabled={!modelsLoaded || modelsFailed} className="btn btn-primary">
+                          {!modelsLoaded && !modelsFailed ? (<><Spinner className="h-4 w-4" /> Loading…</>) : "Turn on camera"}
+                        </button>
+                      ) : (
+                        <>
+                          <button onClick={captureAndMatch} disabled={capturing} className="btn btn-primary">
+                            {matchDistance === null ? "Take photo and check" : "Retake and check"}
+                          </button>
+                          <button onClick={stopCamera} className="btn btn-secondary">Turn off camera</button>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="mt-8 flex justify-between gap-3 border-t border-line pt-6">
+                      <button onClick={() => setStep(2)} className="btn btn-secondary">Back</button>
+                      <button onClick={() => goToStep(4)} disabled={matchDistance === null} className="btn btn-primary">See result</button>
+                    </div>
                   </div>
-                  <p className="mt-4 text-center text-sm text-slate-400">{faceStatus}</p>
-                  <div className="mt-6 flex flex-wrap justify-center gap-3">
-                    {!stream ? (
-                      <button onClick={startCamera} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm">Start Camera</button>
-                    ) : (
-                      <>
-                        <button onClick={captureAndMatch} className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-sm font-semibold">Capture & Match</button>
-                        <button onClick={stopCamera} className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sm">Stop</button>
-                      </>
+                )}
+
+                {/* ------------------ Step 4: result ------------------ */}
+                {step === 4 && (
+                  <div aria-live="polite">
+                    {verifying && (
+                      <div className="flex flex-col items-center py-14 text-center">
+                        <Spinner className="h-10 w-10 text-brand" />
+                        <h2 className="mt-5 text-xl font-bold">Verifying your identity</h2>
+                        <p className="mt-1 text-ink-soft">This takes a moment.</p>
+                      </div>
+                    )}
+
+                    {!verifying && verified && (
+                      <div>
+                        <h2 className="text-2xl font-bold">You&rsquo;re verified</h2>
+                        <p className="mt-1 mb-6 max-w-[56ch] text-ink-soft">
+                          Your face matches your ID with {strength?.toFixed(0)}% strength. Complete your enrolment to save your membership.
+                        </p>
+                        <div className="rounded-xl bg-brand-tint p-4">
+                          <p className="text-sm text-brand-deep">Your membership number</p>
+                          <p className="mt-0.5 font-mono text-2xl font-semibold tracking-wider text-brand-deep">{membershipId}</p>
+                        </div>
+                        {dbError && (
+                          <p role="alert" className="mt-4 rounded-lg bg-stamp-tint p-3 text-sm font-medium text-stamp">{dbError}</p>
+                        )}
+                        <div className="mt-8 flex justify-end">
+                          <button onClick={completeRegistration} disabled={saving} className="btn btn-primary w-full sm:w-auto">
+                            {saving ? (<><Spinner className="h-4 w-4" /> Saving…</>) : "Complete enrolment"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!verifying && verified === false && (
+                      <div>
+                        <h2 className="text-2xl font-bold text-stamp">We couldn&rsquo;t match your face</h2>
+                        <p className="mt-1 mb-5 max-w-[56ch] text-ink-soft">
+                          Match strength was {strength?.toFixed(0)}%, and {PASS_STRENGTH.toFixed(0)}% is needed. This is usually down to lighting or the ID photo.
+                        </p>
+                        <ul className="mb-8 list-disc space-y-1.5 pl-5 text-ink-soft">
+                          <li>Face a window or lamp, not a bright light behind you.</li>
+                          <li>Take off glasses, a cap or a face covering.</li>
+                          <li>Upload a sharper photo of your ID with no glare on the portrait.</li>
+                        </ul>
+                        <div className="flex flex-wrap justify-end gap-3">
+                          <button onClick={() => setStep(2)} className="btn btn-secondary">Upload ID again</button>
+                          <button onClick={() => setStep(3)} className="btn btn-primary">Try the camera again</button>
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div className="mt-8 flex justify-between">
-                    <button onClick={() => setStep(2)} className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700">Back</button>
-                    <button onClick={() => goToStep(4)} disabled={matchDistance === null} className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold disabled:opacity-50">View Result</button>
-                  </div>
-                </div>
-              )}
+                )}
 
-              {step === 4 && (
-                <div className="glass rounded-2xl p-6 md:p-8 text-center">
-                  {verifying && <p className="py-12 text-lg">Running biometric verification...</p>}
-                  {!verifying && verified && (
-                    <>
-                      <h2 className="text-2xl font-bold text-emerald-400 mb-2">Identity Verified</h2>
-                      <p className="mb-4">Confidence: {matchDistance !== null ? ((1 - matchDistance) * 100).toFixed(1) : "—"}%</p>
-                      <p className="text-blue-400 font-mono mb-6">{membershipId}</p>
-                      <button
-                        onClick={completeRegistration}
-                        disabled={saving}
-                        className="px-8 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-semibold disabled:opacity-50"
-                      >
-                        {saving ? "Saving to database..." : "Complete Enrolment"}
-                      </button>
-                    </>
-                  )}
-                  {!verifying && verified === false && (
-                    <>
-                      <h2 className="text-2xl font-bold text-rose-400 mb-2">Verification Failed</h2>
-                      <p className="mb-6">Distance: {matchDistance?.toFixed(3)}</p>
-                      <button onClick={() => setStep(3)} className="px-6 py-3 rounded-xl bg-slate-800 mr-2">Retry</button>
-                      <button onClick={() => setStep(2)} className="px-6 py-3 rounded-xl bg-blue-600">Re-upload ID</button>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {step === 5 && (
-                <div className="glass rounded-2xl p-8 text-center">
-                  <h2 className="text-3xl font-bold mb-2">Welcome to Unity Party!</h2>
-                  <p className="text-slate-300 mb-1">Your membership is now live in the database.</p>
-                  <p className="text-blue-400 font-mono text-lg mb-6">{membershipId}</p>
-                  <button onClick={() => { resetForm(); setView("members"); }} className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-semibold">
-                    View Live Members
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {view === "members" && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold">Registered Members</h2>
-                  <p className="text-slate-400 text-sm">Live from Supabase · updates in real-time</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {loadingMembers && <span className="text-xs text-slate-400">Loading...</span>}
-                  <span className="px-3 py-1 rounded-full bg-blue-600/20 text-blue-300 text-sm font-medium">
-                    {members.length} member{members.length !== 1 ? "s" : ""}
-                  </span>
-                  <button onClick={fetchMembers} className="text-xs text-slate-400 hover:text-white underline">Refresh</button>
-                </div>
-              </div>
-              {members.length === 0 ? (
-                <p className="text-slate-500 py-12 text-center">
-                  No members yet. <button onClick={() => setView("register")} className="text-blue-400">Enrol now</button>
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {members.map((m) => (
-                    <div key={m.membership_id} className="glass rounded-xl p-4 flex justify-between items-center">
-                      <div>
-                        <p className="font-semibold">{m.full_name}</p>
-                        <p className="text-sm text-slate-400">{m.membership_id} · {m.id_number}</p>
-                        <p className="text-xs text-slate-500 mt-1">{new Date(m.registered_at).toLocaleString()}</p>
-                      </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-300">
-                        Verified {m.match_score}%
-                      </span>
+                {/* ------------------ Step 5: done ------------------ */}
+                {step === 5 && (
+                  <div>
+                    <h2 className="text-3xl font-extrabold">Welcome, {formData.fullName.split(" ")[0] || "member"}</h2>
+                    <p className="mt-2 max-w-[52ch] text-lg text-ink-soft">
+                      Your membership is active. Keep your number safe: you&rsquo;ll need it to prove you&rsquo;re a member.
+                    </p>
+                    <p className="mt-6 font-mono text-2xl font-semibold tracking-wider text-brand">{membershipId}</p>
+                    <div className="mt-8 flex flex-wrap gap-3">
+                      <button onClick={() => { resetForm(); setView("members"); }} className="btn btn-primary">See all members</button>
+                      <button onClick={resetForm} className="btn btn-secondary">Enrol someone else</button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {view === "admin" && (
-            <div className="glass rounded-2xl p-6">
-              <h2 className="text-2xl font-bold mb-6">Admin Dashboard</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                <div className="bg-slate-900/60 rounded-xl p-5">
-                  <p className="text-sm text-slate-400">Total</p>
-                  <p className="text-3xl font-bold">{members.length}</p>
-                </div>
-                <div className="bg-slate-900/60 rounded-xl p-5">
-                  <p className="text-sm text-slate-400">Verified</p>
-                  <p className="text-3xl font-bold text-emerald-400">{members.filter((m) => m.verified).length}</p>
-                </div>
-                <div className="bg-slate-900/60 rounded-xl p-5">
-                  <p className="text-sm text-slate-400">Realtime</p>
-                  <p className="text-3xl font-bold text-blue-400">Live</p>
-                </div>
+                  </div>
+                )}
               </div>
-              <button onClick={clearAllMembers} className="px-4 py-2 rounded-lg bg-rose-600/20 text-rose-300 text-sm mr-3">
-                Clear All Members
-              </button>
-              <button onClick={fetchMembers} className="px-4 py-2 rounded-lg bg-slate-800 text-sm">
-                Refresh
-              </button>
-              <div className="mt-6 p-4 bg-slate-900/40 rounded-xl text-sm text-slate-400">
-                <p className="font-medium text-slate-300 mb-2">Supabase Realtime</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>New registrations appear instantly across all open tabs/browsers.</li>
-                  <li>Facial matching remains client-side for privacy.</li>
-                  <li>Make sure Realtime is enabled on the <code className="text-blue-300">members</code> table.</li>
+            </div>
+
+            {/* Live membership card */}
+            {showCard && (
+              <aside
+                className={`min-w-0 lg:sticky lg:top-24 ${issued ? "order-1 lg:order-2" : ""}`}
+                aria-label="Membership card preview"
+              >
+                <MembershipCard
+                  name={formData.fullName.trim()}
+                  dob={formData.dob}
+                  state={formData.state.trim()}
+                  idNumber={formData.idNumber}
+                  photo={idImage}
+                  membershipId={issued || (step === 4 && verified) ? membershipId : ""}
+                  issued={issued}
+                />
+                {!issued && (
+                  <p className="mt-4 max-w-[42ch] text-sm text-ink-soft">
+                    This is your card. It fills in as you go and is issued once your face is verified.
+                  </p>
+                )}
+              </aside>
+            )}
+          </div>
+        )}
+
+        {/* =========================== MEMBERS =========================== */}
+        {view === "members" && (
+          <section>
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-extrabold sm:text-4xl">Members</h1>
+                <p className="mt-1 flex items-center gap-2 text-ink-soft">
+                  <span
+                    className={`inline-block h-2.5 w-2.5 rounded-full ${live ? "live-dot bg-brand" : "bg-line-strong"}`}
+                    aria-hidden="true"
+                  />
+                  {live ? "Live: new members appear here as they enrol." : "Reconnecting to live updates…"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={fetchMembers} disabled={loadingMembers} className="btn btn-secondary !min-h-10">
+                  {loadingMembers ? (<><Spinner className="h-4 w-4" /> Refreshing</>) : "Refresh"}
+                </button>
+                <button onClick={exportCsv} disabled={members.length === 0} className="btn btn-secondary !min-h-10">Export CSV</button>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="search" className="sr-only">Search members</label>
+              <input
+                id="search"
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by name, membership number, state or ID"
+                className="field-input sm:max-w-md"
+              />
+            </div>
+
+            {members.length === 0 && !loadingMembers ? (
+              <div className="rounded-2xl border border-dashed border-line-strong bg-surface px-6 py-16 text-center">
+                <h2 className="text-xl font-bold">No members yet</h2>
+                <p className="mx-auto mt-1 max-w-[40ch] text-ink-soft">The first person to finish enrolment will show up here straight away.</p>
+                <button onClick={() => setView("register")} className="btn btn-primary mt-6">Enrol a member</button>
+              </div>
+            ) : filtered.length === 0 ? (
+              <p className="rounded-2xl border border-line bg-surface px-6 py-12 text-center text-ink-soft">
+                No members match &ldquo;{query}&rdquo;. Check the spelling or clear the search.
+              </p>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+                <div className="hidden grid-cols-[2.5fr_1.4fr_1fr_1fr_0.9fr] gap-4 border-b border-line bg-paper px-5 py-3 text-sm font-semibold text-ink-soft md:grid">
+                  <span>Member</span>
+                  <span>Membership number</span>
+                  <span>State</span>
+                  <span>Joined</span>
+                  <span className="text-right">Match</span>
+                </div>
+                <ul className="divide-y divide-line">
+                  {filtered.map((m) => (
+                    <li key={m.membership_id} className="grid items-center gap-x-4 gap-y-1 px-5 py-4 md:grid-cols-[2.5fr_1.4fr_1fr_1fr_0.9fr]">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-deep text-sm font-bold text-white" aria-hidden="true">
+                          {initials(m.full_name)}
+                        </span>
+                        <span className="truncate font-semibold">{m.full_name}</span>
+                      </div>
+                      <span className="font-mono text-sm md:text-base">{m.membership_id}</span>
+                      <span className="text-sm text-ink-soft md:text-base">{m.state || "—"}</span>
+                      <span className="text-sm text-ink-soft md:text-base">{timeAgo(m.registered_at)}</span>
+                      <span className="md:text-right">
+                        <span className="inline-block rounded-full bg-brand-tint px-2.5 py-1 text-sm font-semibold text-brand-deep">
+                          {m.match_score}%
+                        </span>
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               </div>
-            </div>
-          )}
-        </main>
+            )}
+          </section>
+        )}
 
-        <footer className="border-t border-white/5 mt-16 py-6 text-center text-xs text-slate-500">
-          Unity Party · Next.js 16 · Supabase Realtime · Privacy-first face verification
-        </footer>
-      </div>
+        {/* =========================== ADMIN =========================== */}
+        {view === "admin" && (
+          <section>
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+              <h1 className="text-3xl font-extrabold sm:text-4xl">Admin</h1>
+              <div className="flex items-center gap-2">
+                <button onClick={fetchMembers} disabled={loadingMembers} className="btn btn-secondary !min-h-10">Refresh</button>
+                <button onClick={exportCsv} disabled={members.length === 0} className="btn btn-primary !min-h-10">Export CSV</button>
+              </div>
+            </div>
+
+            <p className="mb-6 rounded-xl bg-brass-tint px-4 py-3 text-sm text-[#6b4a00]">
+              This page isn&rsquo;t password-protected in the demo. Add sign-in before sharing the site publicly.
+            </p>
+
+            <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                ["Total members", String(stats.total)],
+                ["Enrolled today", String(stats.today)],
+                ["Verified", String(stats.verified)],
+                ["Average match", stats.avg === null ? "—" : `${stats.avg.toFixed(0)}%`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-line bg-surface p-5">
+                  <dt className="text-sm text-ink-soft">{label}</dt>
+                  <dd className="mt-1 font-display text-4xl font-extrabold tracking-tight">{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+                <h2 className="text-lg font-bold">Members by state</h2>
+                {stats.states.length === 0 ? (
+                  <p className="mt-3 text-ink-soft">Nothing to show until someone enrols.</p>
+                ) : (
+                  <ul className="mt-4 space-y-3">
+                    {stats.states.map(([s, n]) => (
+                      <li key={s}>
+                        <div className="mb-1 flex justify-between text-sm">
+                          <span className="font-medium">{s}</span>
+                          <span className="text-ink-soft">{n}</span>
+                        </div>
+                        <div className="h-2.5 rounded-full bg-paper">
+                          <div className="h-full rounded-full bg-brand" style={{ width: `${(n / stats.states[0][1]) * 100}%` }} />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
+                <h2 className="text-lg font-bold">Latest enrolments</h2>
+                {members.length === 0 ? (
+                  <p className="mt-3 text-ink-soft">Nothing to show until someone enrols.</p>
+                ) : (
+                  <ul className="mt-4 divide-y divide-line">
+                    {members.slice(0, 5).map((m) => (
+                      <li key={m.membership_id} className="flex items-center justify-between gap-3 py-2.5">
+                        <span className="truncate font-medium">{m.full_name}</span>
+                        <span className="shrink-0 text-sm text-ink-soft">{timeAgo(m.registered_at)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-stamp/30 bg-stamp-tint p-5 sm:p-6">
+              <div>
+                <h2 className="text-lg font-bold text-stamp">Delete all members</h2>
+                <p className="mt-0.5 max-w-[52ch] text-sm text-ink-soft">Permanently removes every member record. Export a CSV first if you need a copy.</p>
+              </div>
+              <button onClick={() => setConfirmClear(true)} disabled={members.length === 0} className="btn btn-danger">Delete all members</button>
+            </div>
+          </section>
+        )}
+      </main>
+
+      <footer className="border-t border-line bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-6 text-sm text-ink-soft sm:px-6">
+          Face matching runs in your browser. ID and selfie photos are never sent to our servers; only your details and match score are saved.
+        </div>
+      </footer>
+
+      {/* Confirm dialog */}
+      {confirmClear && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4"
+          onKeyDown={(e) => e.key === "Escape" && setConfirmClear(false)}
+        >
+          <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc" className="pop-in w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 id="confirm-title" className="text-xl font-bold">Delete all {members.length} members?</h2>
+            <p id="confirm-desc" className="mt-2 text-ink-soft">This permanently removes every record and can&rsquo;t be undone.</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button autoFocus onClick={() => setConfirmClear(false)} className="btn btn-secondary">Keep members</button>
+              <button onClick={clearAllMembers} className="btn btn-danger">Delete all members</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div role="status" className={`pop-in fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-semibold shadow-lg ${
+          toast.tone === "error" ? "bg-stamp text-white" : toast.tone === "ok" ? "bg-brand-deep text-white" : "bg-ink text-white"
+        }`}>
+          {toast.text}
+        </div>
+      )}
     </>
   );
 }

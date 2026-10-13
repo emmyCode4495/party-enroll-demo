@@ -1,50 +1,292 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------
+   Design tokens — "ballot paper" civic palette
+   ------------------------------------------------------------------ */
 :root {
-  --background: #020617;
-  --foreground: #f1f5f9;
+  --paper: #f4f6f3;
+  --surface: #ffffff;
+  --ink: #0f2a24;
+  --ink-soft: #4a5f58;
+  --line: #d9e0db;
+  --line-strong: #b9c5be;
+  --green: #0a6b45;
+  --green-hover: #085738;
+  --green-deep: #08382b;
+  --green-tint: #e3f1ea;
+  --brass: #d9a431;
+  --brass-tint: #fbf1d9;
+  --stamp: #b4322a;
+  --stamp-tint: #fbe9e7;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--green);
+  --color-brand-hover: var(--green-hover);
+  --color-brand-deep: var(--green-deep);
+  --color-brand-tint: var(--green-tint);
+  --color-brass: var(--brass);
+  --color-brass-tint: var(--brass-tint);
+  --color-stamp: var(--stamp);
+  --color-stamp-tint: var(--stamp-tint);
+  --font-sans: var(--f-body), system-ui, sans-serif;
+  --font-display: var(--f-display), var(--f-body), system-ui, sans-serif;
+  --font-mono: var(--f-mono), ui-monospace, monospace;
+}
+
+html {
+  background: var(--paper);
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Glass effect */
-.glass {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+h1,
+h2,
+h3 {
+  font-family: var(--f-display), var(--f-body), system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 3px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: var(--green-tint);
+}
+
+/* ------------------------------------------------------------------
+   Form controls
+   ------------------------------------------------------------------ */
+.field-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field-input::placeholder {
+  color: #8a9a93;
+}
+.field-input:hover {
+  border-color: var(--ink-soft);
+}
+.field-input:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: 0 0 0 4px rgba(10, 107, 69, 0.18);
+}
+.field-input[aria-invalid="true"] {
+  border-color: var(--stamp);
+  background: var(--stamp-tint);
+}
+.field-input[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 4px rgba(180, 50, 42, 0.18);
+}
+
+/* ------------------------------------------------------------------
+   Buttons
+   ------------------------------------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0 1.4rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.975rem;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.btn-primary {
+  background: var(--green);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--green-hover);
+}
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+.btn-danger {
+  background: var(--stamp);
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #962a23;
+}
+.btn-quiet {
+  background: transparent;
+  color: var(--ink-soft);
+  min-height: 40px;
+  padding: 0 0.75rem;
+}
+.btn-quiet:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgba(15, 42, 36, 0.06);
+}
+
+/* ------------------------------------------------------------------
+   Membership card — the one memorable object
+   ------------------------------------------------------------------ */
+.member-card {
+  position: relative;
+  aspect-ratio: 1.586 / 1;
+  width: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  color: #f2f7f4;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(217, 164, 49, 0.22), transparent 55%),
+    repeating-radial-gradient(circle at 18% 120%, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 9px),
+    linear-gradient(155deg, #0c4a37 0%, #08382b 60%, #062a20 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 24px 48px -20px rgba(8, 56, 43, 0.55);
+  container-type: inline-size;
+}
+.member-card[data-state="draft"] {
+  filter: saturate(0.7);
+}
+.member-card .card-label {
+  font-size: clamp(8px, 2.6cqw, 11px);
+  opacity: 0.65;
+  letter-spacing: 0.01em;
+}
+.member-card .card-value {
+  font-size: clamp(11px, 3.8cqw, 16px);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.member-card .card-name {
+  font-family: var(--f-display), var(--f-body), sans-serif;
+  font-size: clamp(15px, 6.4cqw, 28px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* Stamp that lands when verification passes */
+.card-stamp {
+  position: absolute;
+  right: 6%;
+  bottom: 9%;
+  padding: 0.25em 0.7em;
+  border: 2.5px solid var(--brass);
+  color: var(--brass);
+  border-radius: 8px;
+  font-family: var(--f-display), sans-serif;
+  font-weight: 800;
+  font-size: clamp(11px, 4.4cqw, 20px);
+  letter-spacing: 0.04em;
+  transform: rotate(-9deg);
+  background: rgba(8, 56, 43, 0.55);
+  animation: stamp-in 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) 0.15s both;
+}
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: rotate(-9deg) scale(2.2);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-9deg) scale(1);
+  }
+}
+
+/* ------------------------------------------------------------------
+   Camera
+   ------------------------------------------------------------------ */
 .scan-line {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 12%;
+  right: 12%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #3b82f6, transparent);
-  animation: scan 2s linear infinite;
+  background: linear-gradient(90deg, transparent, var(--brass), transparent);
+  animation: scan 2.2s ease-in-out infinite;
 }
-
 @keyframes scan {
-  0% { top: 10%; }
-  50% { top: 90%; }
-  100% { top: 10%; }
+  0%,
+  100% {
+    top: 18%;
+  }
+  50% {
+    top: 82%;
+  }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.live-dot {
+  animation: pulse-dot 1.8s ease-in-out infinite;
 }
 
-.fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pop-in {
+  animation: pop-in 0.22s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .scan-line,
+  .live-dot,
+  .pop-in,
+  .card-stamp {
+    animation: none !important;
+  }
+  .card-stamp {
+    opacity: 1;
+  }
 }
