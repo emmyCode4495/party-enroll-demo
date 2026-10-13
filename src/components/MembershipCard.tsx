@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { QRCodeSVG } from "qrcode.react";
 
 type Props = {
   name: string;
@@ -26,7 +27,6 @@ function formatDob(dob: string) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-/** Deterministic barcode-style strip derived from the membership id. */
 function Bars({ seed }: { seed: string }) {
   const bars = useMemo(() => {
     const out: { x: number; w: number }[] = [];
@@ -53,6 +53,10 @@ function Bars({ seed }: { seed: string }) {
 export default function MembershipCard({ name, dob, state, idNumber, photo, membershipId, issued }: Props) {
   const dobText = formatDob(dob);
   const idText = maskId(idNumber);
+  const verifyUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/verify/${membershipId}`
+      : `/verify/${membershipId}`;
 
   return (
     <div
@@ -62,69 +66,92 @@ export default function MembershipCard({ name, dob, state, idNumber, photo, memb
       aria-label={
         issued
           ? `Verified membership card for ${name}, number ${membershipId}`
-          : "Preview of your membership card. It fills in as you complete each step."
+          : "Preview of your membership card."
       }
     >
-      <div className="absolute inset-0 flex flex-col justify-between p-[6%]">
-        {/* Top row: brand + status */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-[0.6em]">
-            <svg viewBox="0 0 32 32" className="h-[2.2em] w-[2.2em]" style={{ fontSize: "clamp(9px, 3.2cqw, 14px)" }} aria-hidden="true">
-              <circle cx="12" cy="16" r="9" fill="none" stroke="#d9a431" strokeWidth="2.5" />
-              <circle cx="20" cy="16" r="9" fill="none" stroke="#f2f7f4" strokeWidth="2.5" />
+      <div className="absolute inset-0 flex flex-col justify-between p-[5%]">
+        {/* Top: brand + portrait + QR */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-[0.5em] min-w-0">
+            <svg viewBox="0 0 32 32" className="h-[1.8em] w-[1.8em] shrink-0" style={{ fontSize: "clamp(10px, 3.2cqw, 14px)" }}>
+              <rect width="32" height="32" rx="8" fill="#d9a431" />
+              <text x="16" y="22" textAnchor="middle" fill="#08382b" fontSize="16" fontWeight="800" fontFamily="system-ui">
+                U
+              </text>
             </svg>
-            <div>
-              <p className="card-name" style={{ fontSize: "clamp(11px, 4cqw, 17px)" }}>Unity Party</p>
-              <p className="card-label">Member card</p>
+            <div className="min-w-0">
+              <div className="font-display font-bold leading-none truncate" style={{ fontSize: "clamp(10px, 3.5cqw, 15px)" }}>
+                UNITY PARTY
+              </div>
+              <div className="opacity-60 leading-none mt-[0.2em]" style={{ fontSize: "clamp(7px, 2.2cqw, 10px)" }}>
+                Official Member
+              </div>
             </div>
           </div>
-          <p className="card-label text-right">{issued ? "Active" : "Not issued yet"}</p>
-        </div>
 
-        {/* Middle: photo + identity */}
-        <div className="flex items-end gap-[5%]">
-          <div
-            className="relative aspect-[3/4] w-[24%] shrink-0 overflow-hidden rounded-[10px] border border-white/25 bg-white/10"
-          >
-            {photo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photo} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <svg viewBox="0 0 30 40" className="h-full w-full opacity-40" aria-hidden="true">
-                <circle cx="15" cy="15" r="6" fill="currentColor" />
-                <path d="M3 40c0-9 5-14 12-14s12 5 12 14z" fill="currentColor" />
-              </svg>
+          <div className="flex items-start gap-[0.4em] shrink-0">
+            {/* Face portrait */}
+            <div
+              className="rounded-lg overflow-hidden border-2 border-[rgba(217,164,49,0.55)] bg-[rgba(0,0,0,0.25)] shrink-0"
+              style={{ width: "clamp(44px, 16cqw, 68px)", height: "clamp(52px, 19cqw, 80px)" }}
+            >
+              {photo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photo} alt="" className="h-full w-full object-cover object-center" />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center opacity-40">
+                  <svg viewBox="0 0 24 24" className="w-[45%] h-[45%]" fill="currentColor">
+                    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v1.2h19.2v-1.2c0-3.2-6.4-4.8-9.6-4.8z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {issued && membershipId && (
+              <div
+                className="bg-white rounded-md p-[3px] shrink-0"
+                style={{ width: "clamp(44px, 16cqw, 68px)", height: "clamp(44px, 16cqw, 68px)" }}
+              >
+                <QRCodeSVG
+                  value={verifyUrl}
+                  size={256}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#08382b"
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </div>
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className={`card-name truncate ${name ? "" : "opacity-40"}`}>{name || "Your full name"}</p>
-            <dl className="mt-[4%] grid grid-cols-2 gap-x-[6%] gap-y-[3%]">
-              <div className="min-w-0">
-                <dt className="card-label">Born</dt>
-                <dd className={`card-value truncate ${dobText ? "" : "opacity-40"}`}>{dobText || "—"}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="card-label">State</dt>
-                <dd className={`card-value truncate ${state ? "" : "opacity-40"}`}>{state || "—"}</dd>
-              </div>
-              <div className="col-span-2 min-w-0">
-                <dt className="card-label">ID number</dt>
-                <dd className={`card-value font-mono truncate ${idText ? "" : "opacity-40"}`}>{idText || "—"}</dd>
-              </div>
-            </dl>
+        </div>
+
+        {/* Name + details */}
+        <div className="mt-[3%]">
+          <div className="card-name truncate">{name || "Your name"}</div>
+          <div className="mt-[0.55em] grid grid-cols-2 gap-x-[1em] gap-y-[0.35em]">
+            <div>
+              <div className="card-label">Date of birth</div>
+              <div className="card-value">{dobText || "—"}</div>
+            </div>
+            <div>
+              <div className="card-label">State</div>
+              <div className="card-value truncate">{state || "—"}</div>
+            </div>
+            <div>
+              <div className="card-label">ID number</div>
+              <div className="card-value font-mono">{idText || "—"}</div>
+            </div>
+            <div>
+              <div className="card-label">Member ID</div>
+              <div className="card-value font-mono truncate">{membershipId || "—"}</div>
+            </div>
           </div>
         </div>
 
-        {/* Bottom: membership number + barcode */}
-        <div className="flex items-end justify-between gap-[6%]">
-          <div className="min-w-0">
-            <p className="card-label">Membership number</p>
-            <p className={`card-value font-mono tracking-wider ${issued ? "" : "opacity-40"}`}>
-              {membershipId || "UP-••••••••"}
-            </p>
-          </div>
-          <div className="h-[9%] min-h-[14px] w-[30%] text-white/70">
-            <Bars seed={membershipId} />
+        {/* Barcode */}
+        <div className="mt-auto pt-[2.5%]">
+          <div className="h-[0.85em] text-[var(--brass)] opacity-80">
+            <Bars seed={membershipId || name || "UNITY"} />
           </div>
         </div>
       </div>

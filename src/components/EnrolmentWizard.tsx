@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { supabase, type Member } from "@/lib/supabase";
 import MembershipCard from "./MembershipCard";
@@ -156,12 +157,14 @@ function BrandMark() {
 /* Main component                                                      */
 /* ------------------------------------------------------------------ */
 
-export default function EnrolmentWizard() {
+export default function EnrolmentWizard({ userId }: { userId: string }) {
+  const router = useRouter();
   const [view, setView] = useState<View>("register");
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
   const [errors, setErrors] = useState<Errors>({});
   const [idImage, setIdImage] = useState<string | null>(null);
+  const [facePhoto, setFacePhoto] = useState<string | null>(null);
   const [idDescriptor, setIdDescriptor] = useState<Float32Array | null>(null);
   const [matchDistance, setMatchDistance] = useState<number | null>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
@@ -408,6 +411,22 @@ export default function EnrolmentWizard() {
       }
       const dist = faceapi.euclideanDistance(idDescriptor, detection.descriptor);
       setMatchDistance(dist);
+
+      // Snapshot face for the membership card portrait
+      if (video && video.videoWidth) {
+        const snap = document.createElement("canvas");
+        const size = Math.min(video.videoWidth, video.videoHeight);
+        snap.width = 240;
+        snap.height = 280;
+        const sctx = snap.getContext("2d");
+        if (sctx) {
+          const sx = (video.videoWidth - size) / 2;
+          const sy = (video.videoHeight - size) / 2 * 0.6;
+          sctx.drawImage(video, sx, sy, size, size * 1.15, 0, 0, 240, 280);
+          setFacePhoto(snap.toDataURL("image/jpeg", 0.72));
+        }
+      }
+
       setFace({
         text: dist <= MATCH_THRESHOLD ? "Captured. Your face matches your ID." : "Captured, but it doesn't match your ID closely enough.",
         tone: dist <= MATCH_THRESHOLD ? "ok" : "warn",
@@ -453,11 +472,26 @@ export default function EnrolmentWizard() {
 
     const confidence = Math.max(0, Math.min(100, (1 - matchDistance) * 100)).toFixed(1);
 
+    // Prevent same identification document being used twice
+    const { data: existing } = await supabase
+      .from("members")
+      .select("membership_id")
+      .eq("id_number", formData.idNumber.trim())
+      .maybeSingle();
+
+    if (existing) {
+      setSaving(false);
+      setDbError("This identification document has already been used to enrol. Each ID can only be registered once.");
+      showToast("This ID document is already registered.", "error");
+      return;
+    }
+
     const payload = {
+      user_id: userId,
       membership_id: membershipId,
       full_name: formData.fullName,
       dob: formData.dob,
-      id_number: formData.idNumber,
+      id_number: formData.idNumber.trim(),
       phone: formData.phone,
       email: formData.email,
       address: formData.address,
@@ -467,11 +501,15 @@ export default function EnrolmentWizard() {
       distance: matchDistance,
       verified: true,
       registered_at: new Date().toISOString(),
+      photo_url: facePhoto || null,
     };
 
     try {
       const { error } = await supabase.from("members").insert([payload]);
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23505") throw new Error("This identification document has already been registered.");
+        throw error;
+      }
       setMembers((prev) => {
         if (prev.some((m) => m.membership_id === membershipId)) return prev;
         return [payload as Member, ...prev];
@@ -493,6 +531,7 @@ export default function EnrolmentWizard() {
     setFormData(EMPTY_FORM);
     setErrors({});
     setIdImage(null);
+    setFacePhoto(null);
     setIdDescriptor(null);
     setMatchDistance(null);
     setVerified(null);
@@ -952,7 +991,7 @@ export default function EnrolmentWizard() {
                     </p>
                     <p className="mt-6 font-mono text-2xl font-semibold tracking-wider text-brand">{membershipId}</p>
                     <div className="mt-8 flex flex-wrap gap-3">
-                      <button onClick={() => { resetForm(); setView("members"); }} className="btn btn-primary">See all members</button>
+                      <button onClick={() => { resetForm(); router.push("/dashboard"); }} className="btn btn-primary">See all members</button>
                       <button onClick={resetForm} className="btn btn-secondary">Enrol someone else</button>
                     </div>
                   </div>
@@ -971,7 +1010,7 @@ export default function EnrolmentWizard() {
                   dob={formData.dob}
                   state={formData.state.trim()}
                   idNumber={formData.idNumber}
-                  photo={idImage}
+                  photo={facePhoto || idImage}
                   membershipId={issued || (step === 4 && verified) ? membershipId : ""}
                   issued={issued}
                 />
