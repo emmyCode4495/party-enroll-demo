@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------
-   Design tokens — "ballot paper" civic palette
+   Design tokens — New Patriotic Party palette (red / white / blue)
    ------------------------------------------------------------------ */
 :root {
-  --paper: #f4f6f3;
+  --paper: #f4f6fb;
   --surface: #ffffff;
-  --ink: #0f2a24;
-  --ink-soft: #4a5f58;
-  --line: #d9e0db;
-  --line-strong: #b9c5be;
-  --green: #0a6b45;
-  --green-hover: #085738;
-  --green-deep: #08382b;
-  --green-tint: #e3f1ea;
-  --brass: #d9a431;
-  --brass-tint: #fbf1d9;
-  --stamp: #b4322a;
-  --stamp-tint: #fbe9e7;
+  --ink: #0e1b3d;
+  --ink-soft: #4a5878;
+  --line: #d9dfec;
+  --line-strong: #b9c3da;
+  --blue: #0b3b9c;
+  --blue-hover: #092d78;
+  --blue-deep: #071f5c;
+  --blue-tint: #e6ecf9;
+  --red: #d4202c;
+  --red-tint: #fdebec;
+  --stamp: #b3121c;
+  --stamp-tint: #fdebec;
 }
 
 @theme inline {
@@ -27,16 +27,16 @@
   --color-ink-soft: var(--ink-soft);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
-  --color-brand: var(--green);
-  --color-brand-hover: var(--green-hover);
-  --color-brand-deep: var(--green-deep);
-  --color-brand-tint: var(--green-tint);
-  --color-brass: var(--brass);
-  --color-brass-tint: var(--brass-tint);
+  --color-brand: var(--blue);
+  --color-brand-hover: var(--blue-hover);
+  --color-brand-deep: var(--blue-deep);
+  --color-brand-tint: var(--blue-tint);
+  --color-accent: var(--red);
+  --color-accent-tint: var(--red-tint);
   --color-stamp: var(--stamp);
   --color-stamp-tint: var(--stamp-tint);
   --font-sans: var(--f-body), system-ui, sans-serif;
-  --font-display: var(--f-display), var(--f-body), system-ui, sans-serif;
+  --font-display: var(--f-body), system-ui, sans-serif;
   --font-mono: var(--f-mono), ui-monospace, monospace;
 }
 
@@ -49,25 +49,26 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--f-body), system-ui, sans-serif;
+  font-weight: 300;
   -webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
 h3 {
-  font-family: var(--f-display), var(--f-body), system-ui, sans-serif;
+  font-family: var(--f-body), system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
 
 /* Visible keyboard focus everywhere */
 :focus-visible {
-  outline: 3px solid var(--brass);
+  outline: 3px solid var(--red);
   outline-offset: 2px;
   border-radius: 6px;
 }
 
 ::selection {
-  background: var(--green-tint);
+  background: var(--blue-tint);
 }
 
 /* ------------------------------------------------------------------
@@ -85,22 +86,22 @@ h3 {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .field-input::placeholder {
-  color: #8a9a93;
+  color: #8a94ad;
 }
 .field-input:hover {
   border-color: var(--ink-soft);
 }
 .field-input:focus {
   outline: none;
-  border-color: var(--green);
-  box-shadow: 0 0 0 4px rgba(10, 107, 69, 0.18);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px rgba(11, 59, 156, 0.18);
 }
 .field-input[aria-invalid="true"] {
   border-color: var(--stamp);
   background: var(--stamp-tint);
 }
 .field-input[aria-invalid="true"]:focus {
-  box-shadow: 0 0 0 4px rgba(180, 50, 42, 0.18);
+  box-shadow: 0 0 0 4px rgba(179, 18, 28, 0.18);
 }
 
 /* ------------------------------------------------------------------
@@ -125,11 +126,11 @@ h3 {
   opacity: 0.5;
 }
 .btn-primary {
-  background: var(--green);
+  background: var(--blue);
   color: #fff;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--green-hover);
+  background: var(--blue-hover);
 }
 .btn-secondary {
   background: var(--surface);
@@ -144,7 +145,7 @@ h3 {
   color: #fff;
 }
 .btn-danger:hover:not(:disabled) {
-  background: #962a23;
+  background: #8f0e16;
 }
 .btn-quiet {
   background: transparent;
@@ -154,7 +155,7 @@ h3 {
 }
 .btn-quiet:hover:not(:disabled) {
   color: var(--ink);
-  background: rgba(15, 42, 36, 0.06);
+  background: rgba(14, 27, 61, 0.06);
 }
 
 /* ------------------------------------------------------------------
@@ -168,12 +169,12 @@ h3 {
   overflow: hidden;
   color: #f2f7f4;
   background:
-    radial-gradient(120% 90% at 100% 0%, rgba(217, 164, 49, 0.22), transparent 55%),
+    radial-gradient(120% 90% at 100% 0%, rgba(212, 32, 44, 0.30), transparent 55%),
     repeating-radial-gradient(circle at 18% 120%, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 9px),
-    linear-gradient(155deg, #0c4a37 0%, #08382b 60%, #062a20 100%);
+    linear-gradient(155deg, #0f45b5 0%, #0b3b9c 55%, #071f5c 100%);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.12) inset,
-    0 24px 48px -20px rgba(8, 56, 43, 0.55);
+    0 24px 48px -20px rgba(7, 31, 92, 0.55);
   container-type: inline-size;
 }
 .member-card[data-state="draft"] {
@@ -190,7 +191,7 @@ h3 {
   line-height: 1.25;
 }
 .member-card .card-name {
-  font-family: var(--f-display), var(--f-body), sans-serif;
+  font-family: var(--f-body), sans-serif;
   font-size: clamp(15px, 6.4cqw, 28px);
   font-weight: 700;
   line-height: 1.1;
@@ -203,15 +204,15 @@ h3 {
   right: 6%;
   bottom: 9%;
   padding: 0.25em 0.7em;
-  border: 2.5px solid var(--brass);
-  color: var(--brass);
+  border: 2.5px solid #fff;
+  color: #fff;
   border-radius: 8px;
-  font-family: var(--f-display), sans-serif;
-  font-weight: 800;
+  font-family: var(--f-body), sans-serif;
+  font-weight: 700;
   font-size: clamp(11px, 4.4cqw, 20px);
   letter-spacing: 0.04em;
   transform: rotate(-9deg);
-  background: rgba(8, 56, 43, 0.55);
+  background: var(--red);
   animation: stamp-in 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) 0.15s both;
 }
 @keyframes stamp-in {
@@ -236,7 +237,7 @@ h3 {
   left: 12%;
   right: 12%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--brass), transparent);
+  background: linear-gradient(90deg, transparent, var(--red), transparent);
   animation: scan 2.2s ease-in-out infinite;
 }
 @keyframes scan {
@@ -370,7 +371,7 @@ h3 {
   color: #1a1a1a;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.5) inset,
-    0 24px 48px -20px rgba(8, 56, 43, 0.35);
+    0 24px 48px -20px rgba(7, 31, 92, 0.35);
   container-type: inline-size;
 }
 .card-magstripe {
@@ -454,5 +455,18 @@ h3 {
   text-transform: uppercase;
 }
 .card-watermark-back span {
-  color: rgba(8, 56, 43, 0.08);
+  color: rgba(7, 31, 92, 0.08);
+}
+
+/* Red / white / blue brand stripe */
+.tricolour {
+  height: 4px;
+  background: linear-gradient(90deg, var(--red) 0 33.33%, #fff 33.33% 66.66%, var(--blue) 66.66% 100%);
+}
+.member-card .tricolour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
 }

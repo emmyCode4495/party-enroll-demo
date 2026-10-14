@@ -1,16 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Instrument_Sans, Geist_Mono } from "next/font/google";
+import { Lato, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({
-  variable: "--f-display",
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-});
-
-const body = Instrument_Sans({
+// Lato Light is the brand font; 700 is loaded only so bold labels render true bold instead of faux bold.
+const body = Lato({
   variable: "--f-body",
   subsets: ["latin"],
+  weight: ["300", "700"],
 });
 
 const mono = Geist_Mono({
@@ -19,13 +15,13 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Unity Party — Become a member",
+  title: "New Patriotic Party — Become a member",
   description:
-    "Join Unity Party in four short steps. Your face is matched to your ID on your own device, and your membership card is issued instantly.",
+    "Join the New Patriotic Party in four short steps. Your face is matched to your ID on your own device, and your membership card is issued instantly.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#08382b",
+  themeColor: "#0b3b9c",
 };
 
 export default function RootLayout({
@@ -34,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable} h-full`}>
+    <html lang="en" className={`${body.variable} ${mono.variable} h-full`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

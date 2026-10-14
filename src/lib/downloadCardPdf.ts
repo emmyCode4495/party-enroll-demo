@@ -50,13 +50,13 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  // Dark green background
+  // Brand blue background
   page.drawRectangle({
     x: 0,
     y: 0,
     width: pageWidth,
     height: pageHeight,
-    color: rgb(0.031, 0.22, 0.169), // #08382b
+    color: rgb(0.043, 0.231, 0.612), // #0b3b9c
   });
 
   // Subtle lighter panel
@@ -65,42 +65,50 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
     y: 14,
     width: pageWidth - 28,
     height: pageHeight - 28,
-    color: rgb(0.047, 0.29, 0.216),
-    borderColor: rgb(0.85, 0.64, 0.19),
+    color: rgb(0.059, 0.271, 0.710),
+    borderColor: rgb(0.831, 0.125, 0.173),
     borderWidth: 0.8,
     opacity: 0.35,
     borderOpacity: 0.4,
   });
 
-  // Brand mark
-  page.drawRectangle({
-    x: 28,
-    y: pageHeight - 58,
-    width: 28,
-    height: 28,
-    color: rgb(0.85, 0.64, 0.19),
-  });
-  page.drawText("U", {
-    x: 35,
-    y: pageHeight - 50,
-    size: 16,
-    font: fontBold,
-    color: rgb(0.031, 0.22, 0.169),
-  });
+  // Brand mark: official logo from /npp-logo.png, falls back to a simple "NPP" tile
+  let logoDrawn = false;
+  try {
+    const res = await fetch("/npp-logo.png");
+    if (res.ok) {
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+      const logo = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+      const box = 34;
+      const scale = Math.min(box / logo.width, box / logo.height);
+      const w = logo.width * scale;
+      const h = logo.height * scale;
+      page.drawRectangle({ x: 26, y: pageHeight - 62, width: box + 4, height: box + 4, color: rgb(1, 1, 1) });
+      page.drawImage(logo, { x: 28 + (box - w) / 2, y: pageHeight - 60 + (box - h) / 2, width: w, height: h });
+      logoDrawn = true;
+    }
+  } catch (e) {
+    console.warn("Could not embed logo", e);
+  }
+  if (!logoDrawn) {
+    page.drawRectangle({ x: 28, y: pageHeight - 58, width: 28, height: 28, color: rgb(1, 1, 1) });
+    page.drawText("NPP", { x: 31, y: pageHeight - 48, size: 10, font: fontBold, color: rgb(0.043, 0.231, 0.612) });
+  }
 
-  page.drawText("UNITY PARTY", {
-    x: 64,
+  page.drawText("NEW PATRIOTIC PARTY", {
+    x: 70,
     y: pageHeight - 42,
     size: 13,
     font: fontBold,
-    color: rgb(0.95, 0.97, 0.95),
+    color: rgb(0.97, 0.98, 1),
   });
   page.drawText("Official Member", {
-    x: 64,
+    x: 70,
     y: pageHeight - 56,
     size: 9,
     font,
-    color: rgb(0.75, 0.85, 0.8),
+    color: rgb(0.82, 0.87, 0.97),
   });
 
   // Portrait (if available)
@@ -119,13 +127,13 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
         width: pw,
         height: ph,
       });
-      // gold border
+      // white border
       page.drawRectangle({
         x: pageWidth - 28 - pw - 78,
         y: pageHeight - 28 - ph,
         width: pw,
         height: ph,
-        borderColor: rgb(0.85, 0.64, 0.19),
+        borderColor: rgb(1, 1, 1),
         borderWidth: 1.5,
       });
       portraitDrawn = true;
@@ -144,8 +152,8 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
       y,
       width: pw,
       height: ph,
-      color: rgb(0.02, 0.15, 0.12),
-      borderColor: rgb(0.85, 0.64, 0.19),
+      color: rgb(0.027, 0.122, 0.361),
+      borderColor: rgb(1, 1, 1),
       borderWidth: 1.5,
     });
   }
@@ -163,7 +171,7 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
     y: pageHeight - 28 - 40,
     size: 12,
     font: fontBold,
-    color: rgb(0.031, 0.22, 0.169),
+    color: rgb(0.027, 0.122, 0.361),
   });
   page.drawText("on web", {
     x: pageWidth - 28 - 52,
@@ -179,12 +187,12 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
     y: pageHeight - 110,
     size: 22,
     font: fontBold,
-    color: rgb(0.98, 0.99, 0.98),
+    color: rgb(1, 1, 1),
   });
 
   // Fields
-  const labelColor = rgb(0.65, 0.78, 0.72);
-  const valueColor = rgb(0.95, 0.97, 0.95);
+  const labelColor = rgb(0.72, 0.80, 0.94);
+  const valueColor = rgb(0.97, 0.98, 1);
   const row1 = pageHeight - 150;
   const row2 = pageHeight - 190;
 
@@ -206,7 +214,7 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
     y: 40,
     width: 90,
     height: 28,
-    borderColor: rgb(0.85, 0.64, 0.19),
+    borderColor: rgb(0.831, 0.125, 0.173),
     borderWidth: 2,
   });
   page.drawText("VERIFIED", {
@@ -214,7 +222,7 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
     y: 48,
     size: 12,
     font: fontBold,
-    color: rgb(0.85, 0.64, 0.19),
+    color: rgb(0.831, 0.125, 0.173),
     rotate: degrees(-8),
   });
 
@@ -224,8 +232,14 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
     y: 22,
     size: 7,
     font,
-    color: rgb(0.55, 0.7, 0.65),
+    color: rgb(0.65, 0.74, 0.92),
   });
+
+  // Red / white / blue stripe
+  const third = pageWidth / 3;
+  page.drawRectangle({ x: 0, y: 0, width: third, height: 6, color: rgb(0.831, 0.125, 0.173) });
+  page.drawRectangle({ x: third, y: 0, width: third, height: 6, color: rgb(1, 1, 1) });
+  page.drawRectangle({ x: third * 2, y: 0, width: third, height: 6, color: rgb(0.059, 0.271, 0.710) });
 
   // Encrypt — user must enter last 4 of membership ID
   await pdfDoc.encrypt({
@@ -247,7 +261,7 @@ export async function downloadEncryptedCardPdf(data: CardPdfData): Promise<void>
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `UnityParty-${data.membershipId}.pdf`;
+  a.download = `NPP-${data.membershipId}.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();

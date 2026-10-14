@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import Logo from "./Logo";
 
 type Props = {
   name: string;
@@ -31,7 +32,7 @@ function Bars({ seed }: { seed: string }) {
   const bars = useMemo(() => {
     const out: { x: number; w: number }[] = [];
     let x = 0;
-    const s = seed || "UNITYPARTY";
+    const s = seed || "NEWPATRIOTICPARTY";
     for (let i = 0; i < 34; i++) {
       const code = s.charCodeAt(i % s.length) + i * 7;
       const w = 1 + (code % 3);
@@ -128,30 +129,18 @@ export default function MembershipCard({
             <div className="absolute inset-0 flex flex-col justify-between p-[5%] z-[1]">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-[0.5em] min-w-0">
-                  <svg
-                    viewBox="0 0 32 32"
-                    className="h-[1.8em] w-[1.8em] shrink-0"
-                    style={{ fontSize: "clamp(10px, 3.2cqw, 14px)" }}
+                  <span
+                    className="flex shrink-0 items-center justify-center rounded-md bg-white p-[2px]"
+                    style={{ fontSize: "clamp(10px, 3.2cqw, 14px)", width: "2.6em", height: "2.6em" }}
                   >
-                    <rect width="32" height="32" rx="8" fill="#d9a431" />
-                    <text
-                      x="16"
-                      y="22"
-                      textAnchor="middle"
-                      fill="#08382b"
-                      fontSize="16"
-                      fontWeight="800"
-                      fontFamily="system-ui"
-                    >
-                      U
-                    </text>
-                  </svg>
+                    <Logo className="h-full w-full" />
+                  </span>
                   <div className="min-w-0">
                     <div
                       className="font-display font-bold leading-none truncate"
                       style={{ fontSize: "clamp(10px, 3.5cqw, 15px)" }}
                     >
-                      UNITY PARTY
+                      NEW PATRIOTIC PARTY
                     </div>
                     <div
                       className="opacity-60 leading-none mt-[0.2em]"
@@ -164,7 +153,7 @@ export default function MembershipCard({
 
                 <div className="flex items-start gap-[0.4em] shrink-0">
                   <div
-                    className="rounded-lg overflow-hidden border-2 border-[rgba(217,164,49,0.55)] bg-[rgba(0,0,0,0.25)] shrink-0"
+                    className="rounded-lg overflow-hidden border-2 border-[rgba(255,255,255,0.6)] bg-[rgba(0,0,0,0.25)] shrink-0"
                     style={{
                       width: "clamp(44px, 16cqw, 68px)",
                       height: "clamp(52px, 19cqw, 80px)",
@@ -204,7 +193,7 @@ export default function MembershipCard({
                         size={256}
                         level="M"
                         bgColor="#ffffff"
-                        fgColor="#08382b"
+                        fgColor="#071f5c"
                         style={{ width: "100%", height: "100%" }}
                       />
                     </div>
@@ -237,11 +226,13 @@ export default function MembershipCard({
               </div>
 
               <div className="mt-auto pt-[2.5%]">
-                <div className="h-[0.85em] text-[var(--brass)] opacity-80">
-                  <Bars seed={membershipId || name || "UNITY"} />
+                <div className="h-[0.85em] text-white opacity-60">
+                  <Bars seed={membershipId || name || "NPP"} />
                 </div>
               </div>
             </div>
+
+            <div className="tricolour" aria-hidden="true" />
 
             {issued && <div className="card-stamp">VERIFIED</div>}
           </div>
@@ -266,7 +257,7 @@ export default function MembershipCard({
                 </div>
 
                 <p className="mt-3 text-[clamp(7px,2.1cqw,10px)] leading-snug text-[#333] opacity-90">
-                  This card remains the property of Unity Party. If found, please return to any
+                  This card remains the property of the New Patriotic Party. If found, please return to any
                   party office or visit the verification page via the QR code on the front.
                 </p>
               </div>
@@ -274,7 +265,7 @@ export default function MembershipCard({
               {/* Machine-readable + barcode */}
               <div className="mt-2">
                 <div className="bg-white rounded-md border border-[#ccc] px-2 py-1.5">
-                  <BackBarcode code={membershipId || idNumber || "UNITY"} />
+                  <BackBarcode code={membershipId || idNumber || "NPP"} />
                   <p className="text-center font-mono text-[clamp(8px,2.4cqw,11px)] text-[#111] tracking-wider mt-1">
                     {membershipId || "—"}
                   </p>
@@ -282,7 +273,7 @@ export default function MembershipCard({
 
                 <div className="mt-2 flex items-end justify-between gap-2">
                   <div className="text-[clamp(7px,2cqw,9px)] text-[#444] leading-tight max-w-[55%]">
-                    <p className="font-semibold text-[#222]">Unity Party · Membership</p>
+                    <p className="font-semibold text-[#222]">New Patriotic Party · Membership</p>
                     <p>Not a government ID. For party identification only.</p>
                   </div>
                   <div className="text-right text-[clamp(7px,2cqw,9px)] text-[#555] font-mono">

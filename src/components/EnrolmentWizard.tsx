@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { supabase, type Member } from "@/lib/supabase";
 import MembershipCard from "./MembershipCard";
+import Logo from "./Logo";
 
 interface FormData {
   fullName: string;
@@ -94,7 +95,7 @@ function toneClasses(t: Tone) {
     case "ok":
       return "bg-brand-tint text-brand-deep";
     case "warn":
-      return "bg-brass-tint text-[#6b4a00]";
+      return "bg-accent-tint text-[#8f0e16]";
     case "error":
       return "bg-stamp-tint text-stamp";
     default:
@@ -143,14 +144,7 @@ function Spinner({ className = "h-5 w-5" }: { className?: string }) {
 }
 
 function BrandMark() {
-  return (
-    <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-brand-deep" aria-hidden="true">
-      <svg viewBox="0 0 32 32" className="h-7 w-7">
-        <circle cx="12" cy="16" r="9" fill="none" stroke="#d9a431" strokeWidth="2.5" />
-        <circle cx="20" cy="16" r="9" fill="none" stroke="#f2f7f4" strokeWidth="2.5" />
-      </svg>
-    </span>
-  );
+  return <Logo className="h-11 w-11" />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -564,7 +558,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `unity-party-members-${todayISO()}.csv`;
+    a.download = `npp-members-${todayISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -598,7 +592,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
 
   const stats = useMemo(() => {
     const today = new Date().toDateString();
-    const scores = members.map((m) => parseFloat(m.match_score)).filter((n) => !Number.isNaN(n));
+    const scores = members.map((m) => parseFloat(m.match_score ?? "")).filter((n) => !Number.isNaN(n));
     const byState = new Map<string, number>();
     members.forEach((m) => {
       const s = m.state?.trim() || "Not given";
@@ -640,7 +634,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
           <div className="flex items-center gap-3">
             <BrandMark />
             <p className="font-display text-lg font-bold leading-none tracking-tight">
-              Unity Party
+              New Patriotic Party
               <span className="mt-1 block text-xs font-medium text-ink-soft">Membership</span>
             </p>
           </div>
@@ -684,8 +678,8 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
             <div className={`min-w-0 ${issued ? "order-2 lg:order-1" : ""}`}>
               {!issued && (
                 <div className="mb-8">
-                  <h1 className="max-w-[18ch] text-4xl font-extrabold leading-[1.05] sm:text-5xl">
-                    Become a member of Unity Party
+                  <h1 className="max-w-[18ch] text-4xl font-bold leading-[1.05] sm:text-5xl">
+                    Become a member of the New Patriotic Party
                   </h1>
                   <p className="mt-4 max-w-[52ch] text-lg leading-relaxed text-ink-soft">
                     It takes about three minutes. Bring your ID and allow camera access. Your photos are checked on this device and are never uploaded.
@@ -701,7 +695,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
                     const current = n === step;
                     return (
                       <li key={label} aria-current={current ? "step" : undefined}>
-                        <div className={`h-1.5 rounded-full ${done ? "bg-brand" : current ? "bg-brass" : "bg-line"}`} />
+                        <div className={`h-1.5 rounded-full ${done ? "bg-brand" : current ? "bg-accent" : "bg-line"}`} />
                         <p className={`mt-2 text-sm ${current ? "font-bold text-ink" : done ? "font-medium text-brand-deep" : "text-ink-soft"}`}>
                           <span className="sr-only">Step </span>
                           {n}
@@ -715,7 +709,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
                 </ol>
               )}
 
-              <div ref={panelRef} tabIndex={-1} className="rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(15,42,36,0.04)] outline-none sm:p-8">
+              <div ref={panelRef} tabIndex={-1} className="rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(14,27,61,0.04)] outline-none sm:p-8">
                 {/* ------------------ Step 1: details ------------------ */}
                 {step === 1 && (
                   <form
@@ -792,7 +786,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
                         setDragOver(false);
                         processIdFile(e.dataTransfer.files?.[0]);
                       }}
-                      className={`flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-colors focus-within:outline focus-within:outline-[3px] focus-within:outline-brass ${
+                      className={`flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-colors focus-within:outline focus-within:outline-[3px] focus-within:outline-accent ${
                         dragOver ? "border-brand bg-brand-tint" : idImage ? "border-line-strong bg-paper" : "border-line-strong bg-paper hover:border-brand"
                       }`}
                     >
@@ -856,10 +850,10 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
                               <ellipse cx="50" cy="58" rx="28" ry="38" fill="black" />
                             </mask>
                           </defs>
-                          <rect width="100" height="125" fill="rgba(8,56,43,0.55)" mask="url(#oval-mask)" />
+                          <rect width="100" height="125" fill="rgba(7,31,92,0.55)" mask="url(#oval-mask)" />
                           <ellipse
                             cx="50" cy="58" rx="28" ry="38" fill="none"
-                            stroke={strength !== null ? (passes ? "#7fe0b0" : "#ff9c92") : "#d9a431"}
+                            stroke={strength !== null ? (passes ? "#7fe0b0" : "#ff9c92") : "#ffffff"}
                             strokeWidth="0.8" strokeDasharray={stream ? "0" : "2 2"}
                           />
                         </svg>
@@ -985,7 +979,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
                 {/* ------------------ Step 5: done ------------------ */}
                 {step === 5 && (
                   <div>
-                    <h2 className="text-3xl font-extrabold">Welcome, {formData.fullName.split(" ")[0] || "member"}</h2>
+                    <h2 className="text-3xl font-bold">Welcome, {formData.fullName.split(" ")[0] || "member"}</h2>
                     <p className="mt-2 max-w-[52ch] text-lg text-ink-soft">
                       Your membership is active. Keep your number safe: you&rsquo;ll need it to prove you&rsquo;re a member.
                     </p>
@@ -1029,7 +1023,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
           <section>
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-extrabold sm:text-4xl">Members</h1>
+                <h1 className="text-3xl font-bold sm:text-4xl">Members</h1>
                 <p className="mt-1 flex items-center gap-2 text-ink-soft">
                   <span
                     className={`inline-block h-2.5 w-2.5 rounded-full ${live ? "live-dot bg-brand" : "bg-line-strong"}`}
@@ -1106,14 +1100,14 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
         {view === "admin" && (
           <section>
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-              <h1 className="text-3xl font-extrabold sm:text-4xl">Admin</h1>
+              <h1 className="text-3xl font-bold sm:text-4xl">Admin</h1>
               <div className="flex items-center gap-2">
                 <button onClick={fetchMembers} disabled={loadingMembers} className="btn btn-secondary !min-h-10">Refresh</button>
                 <button onClick={exportCsv} disabled={members.length === 0} className="btn btn-primary !min-h-10">Export CSV</button>
               </div>
             </div>
 
-            <p className="mb-6 rounded-xl bg-brass-tint px-4 py-3 text-sm text-[#6b4a00]">
+            <p className="mb-6 rounded-xl bg-accent-tint px-4 py-3 text-sm text-[#8f0e16]">
               This page isn&rsquo;t password-protected in the demo. Add sign-in before sharing the site publicly.
             </p>
 
@@ -1126,7 +1120,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-line bg-surface p-5">
                   <dt className="text-sm text-ink-soft">{label}</dt>
-                  <dd className="mt-1 font-display text-4xl font-extrabold tracking-tight">{value}</dd>
+                  <dd className="mt-1 font-display text-4xl font-bold tracking-tight">{value}</dd>
                 </div>
               ))}
             </dl>

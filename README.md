@@ -1,4 +1,4 @@
-# Unity Party — Realtime Member Enrolment (Next.js 16 + Supabase)
+# New Patriotic Party — Realtime Member Enrolment (Next.js 16 + Supabase)
 
 Modern political party membership registration with **client-side facial recognition** and **Supabase Realtime**.
 
@@ -79,3 +79,10 @@ Open http://localhost:3000
 ## Notes
 - For production: add proper RLS policies, authentication, rate limiting, and never expose the service_role key.
 - Face matching threshold is 0.55 (editable in EnrolmentWizard.tsx)
+
+
+## Branding
+
+- Colours: red / white / blue tokens live at the top of `src/app/globals.css` (`--blue`, `--red`).
+- Font: Lato Light (300), loaded in `src/app/layout.tsx`.
+- Logo: place the official logo at `public/npp-logo.png`. It is used in the headers, on the membership card and in the PDF card. Until it exists, a simple "NPP" tile is shown instead.

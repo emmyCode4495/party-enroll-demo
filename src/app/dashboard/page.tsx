@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Logo from "@/components/Logo";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, type Member } from "@/lib/supabase";
@@ -82,10 +83,7 @@ export default function DashboardPage() {
       <header className="border-b border-[var(--line)] bg-[var(--surface)] sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[var(--green)] flex items-center justify-center text-white font-bold text-xs">
-              U
-            </div>
-            <span className="font-display font-bold text-[var(--ink)]">Unity Party</span>
+            <Logo className="h-9 w-9" withName />
           </Link>
           <div className="flex items-center gap-3">
             <span className="text-sm text-[var(--ink-soft)] hidden sm:inline">{user?.email}</span>
@@ -167,7 +165,7 @@ export default function DashboardPage() {
                 {member.membership_id ? (
                   <>
                     {" "}
-                    (<span className="font-mono text-[var(--green)]">
+                    (<span className="font-mono text-[var(--blue)]">
                       ({cardPassword(member.membership_id)})
                     </span>
                   </>
@@ -178,9 +176,9 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-8 text-center max-w-lg mx-auto">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[var(--green-tint)] flex items-center justify-center">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[var(--blue-tint)] flex items-center justify-center">
               <svg
-                className="w-7 h-7 text-[var(--green)]"
+                className="w-7 h-7 text-[var(--blue)]"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
