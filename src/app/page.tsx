@@ -89,7 +89,7 @@ export default function LandingPage() {
       <section className="py-14 border-t border-[var(--line)]">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <p className="text-sm text-[var(--ink-soft)] leading-relaxed">
-            Each identification document can only be used once. Facial matching runs entirely in your browser — no biometric data is sent to our servers. Your membership is protected.
+            Each identification document can only be used once. Facial matching runs entirely in your browser — no biometric data is sent to our servers. Your membership is protected by Supabase authentication.
           </p>
         </div>
       </section>

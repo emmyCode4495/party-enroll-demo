@@ -452,7 +452,7 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
       setTimeout(() => {
         const success = matchDistance <= MATCH_THRESHOLD;
         setVerified(success);
-        if (success) setMembershipId("UP-" + Math.random().toString(36).slice(2, 10).toUpperCase());
+        if (success) setMembershipId("NPP-" + Math.random().toString(36).slice(2, 10).toUpperCase());
         setVerifying(false);
       }, 1400);
     }
