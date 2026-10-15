@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, type Member } from "@/lib/supabase";
 import MembershipCard from "@/components/MembershipCard";
+import AddToWallet from "@/components/AddToWallet";
 import { downloadEncryptedCardPdf, cardPassword } from "@/lib/downloadCardPdf";
 
 export default function DashboardPage() {
@@ -134,6 +135,8 @@ export default function DashboardPage() {
                   your face.
                 </p>
               )}
+
+              <AddToWallet className="pt-1" />
 
               <div className="flex flex-col sm:flex-row gap-2 justify-center pt-1">
                 <button

@@ -6,6 +6,7 @@ import Script from "next/script";
 import { supabase, type Member } from "@/lib/supabase";
 import MembershipCard from "./MembershipCard";
 import Logo from "./Logo";
+import AddToWallet from "./AddToWallet";
 
 interface FormData {
   fullName: string;
@@ -984,7 +985,8 @@ export default function EnrolmentWizard({ userId }: { userId: string }) {
                       Your membership is active. Keep your number safe: you&rsquo;ll need it to prove you&rsquo;re a member.
                     </p>
                     <p className="mt-6 font-mono text-2xl font-semibold tracking-wider text-brand">{membershipId}</p>
-                    <div className="mt-8 flex flex-wrap gap-3">
+                    <AddToWallet className="mt-6 max-w-sm [&>div]:justify-start" />
+                    <div className="mt-6 flex flex-wrap gap-3">
                       <button onClick={() => { resetForm(); router.push("/dashboard"); }} className="btn btn-primary">See all members</button>
                       <button onClick={resetForm} className="btn btn-secondary">Enrol someone else</button>
                     </div>

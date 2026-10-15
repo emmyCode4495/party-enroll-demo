@@ -86,3 +86,20 @@ Open http://localhost:3000
 - Colours: red / white / blue tokens live at the top of `src/app/globals.css` (`--blue`, `--red`).
 - Font: Lato Light (300), loaded in `src/app/layout.tsx`.
 - Logo: place the official logo at `public/npp-logo.png`. It is used in the headers, on the membership card and in the PDF card. Until it exists, a simple "NPP" tile is shown instead.
+
+## Add to Apple Wallet / Google Wallet
+
+After enrolling (and later on the dashboard) members see an **Add to Apple Wallet** button on iPhones and **Add to Google Wallet** on Android phones; on a computer they see whichever you have set up. A button only appears once its settings below are filled in (copy `.env.example` to `.env.local`, or add them in your hosting dashboard). The pass shows the member's name, Member ID, state and join date with a QR code that opens their `/verify` page. It never includes the ID number or date of birth.
+
+### Apple Wallet (needs a paid Apple Developer account)
+1. In the Apple Developer portal create a **Pass Type ID** (for example `pass.org.yourparty.membership`) and a certificate for it, then export the certificate and private key as `.pem` files (`openssl pkcs12 -in cert.p12 -nodes -out signer.pem` gives both).
+2. Download Apple's **WWDR** intermediate certificate and convert it to `.pem`.
+3. Set `APPLE_PASS_TYPE_ID`, `APPLE_TEAM_ID`, `APPLE_WWDR_CERT`, `APPLE_SIGNER_CERT`, `APPLE_SIGNER_KEY` (plus `APPLE_SIGNER_KEY_PASSPHRASE` if the key has one) and `WALLET_LINK_SECRET` (any long random string). Certificates can be pasted as PEM text or as base64 of the file.
+
+### Google Wallet (free)
+1. Create an issuer account in the [Google Pay & Wallet Console](https://pay.google.com/business/console) and note the **Issuer ID**.
+2. In Google Cloud, create a service account, enable the **Google Wallet API**, create a JSON key, and add the service account's email as a user in the Wallet console.
+3. Set `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_WALLET_PRIVATE_KEY` (the `private_key` from the JSON key).
+4. Passes work in demo mode until your issuer account is approved for production. The logo only shows on a public `https` site, not on localhost.
+
+Set `NEXT_PUBLIC_APP_URL` to your site's public address so the QR code points to the right place.
